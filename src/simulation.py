@@ -30,7 +30,8 @@ def monte_carlo(T:int, sims:int, vol_mult:float, df:pd.DataFrame, rand:str=None)
 
       #Generate paths
       for m in range(sims):
-        dailyReturns = np.random.normal(loc=expected_return, scale=vol, size=T)
+        dailyReturns = np.random.standard_t(df=5, size=T) * vol + expected_return
+        dailyReturns = np.clip(dailyReturns, -0.95, 0.95) #Removes extremely disoriented returns caused by fat tails
         cumReturns = (1+dailyReturns).cumprod()
         prices = last_price*cumReturns
         sims_prices[ticker][m:,] = prices
