@@ -19,27 +19,33 @@ def monte_carlo(T:int, sims:int, vol_mult:float, df:pd.DataFrame, rand:str=None)
       print("Warning: Limited price data may lead to unreliable metrics.")
       
     #Intialize dictionary to store simulated paths of T days for each ticker
-    sims_prices = {ticker: np.full(shape=(sims, T), fill_value=0.0) for ticker in df.columns}
+    tickers = list(df.columns)
+    sims_prices = {ticker: np.full(shape=(T, sims), fill_value=0.0) for ticker in tickers}
+    
+    method = method.strip().lower()
 
-    #Gather inital metrics from historical data for each ticker
-    for ticker in df.columns:
-      last_price = df[ticker].iloc[-1]
-      log_returns = np.log(df[ticker]/df[ticker].shift()).dropna()
-      expected_return = log_returns.mean()
-      vol = log_returns.std()*vol_mult
+    #Gather inital metrics from historical data
+    last_prices = np.array(df.iloc[-1])
+    log_returns = np.log(df/df.shift()).dropna()
+    cov_matrix = log_returns.cov()*(vol_mult**2)
+    L = np.linalg.cholesky(cov_matrix)
 
-      #Generate paths
-      for m in range(sims):
-        dailyReturns = np.random.standard_t(df=5, size=T) * vol + expected_return
-        dailyReturns = np.clip(dailyReturns, -0.95, 0.95) #Removes extremely disoriented returns caused by fat tails
-        cumReturns = (1+dailyReturns).cumprod()
-        prices = last_price*cumReturns
-        sims_prices[ticker][m:,] = prices
+    expected_return = log_returns.mean()
+    meanM = np.full(shape=(T, len(tickers)), fill_value=expected_return)
+
+    #Generate paths
+    for m in range(sims):
+      Z = np.random.normal(size=(T, len(tickers)))
+      dailyReturns = meanM + Z @ L.T
+      cumReturns = (1+dailyReturns).cumprod(axis=0)
+      prices = last_prices*cumReturns
+      for i, ticker in enumerate(tickers):
+        sims_prices[ticker][:,m] = prices[:,i]
 
     #Get a random path
     if isinstance(rand, str) and rand.strip().lower() == "yes":
       random_int = np.random.randint(0,sims)
-      random_sims_prices = {ticker: sims_prices[ticker][random_int] for ticker in df.columns}
+      random_sims_prices = {ticker: sims_prices[ticker][:,random_int] for ticker in tickers}
       random_sims_df = pd.DataFrame(random_sims_prices)
       return random_sims_df
     elif rand != None:
