@@ -5,27 +5,32 @@ from scipy.optimize import minimize
 
 class Portfolio:
   def __init__(self, portfolio:list,  lower_bound:float, upper_bound:float):
+    try:
+      if lower_bound >= upper_bound:
+        raise ValueError("Lower bound must be less than upper bound.")
 
-    self.portfolio = portfolio
-    self.weights = None
-    self.dfclose = None
-    self.lower_bound = lower_bound
-    self.upper_bound = upper_bound
-    self.boundfail = False
+      self.portfolio = portfolio
+      self.weights = None
+      self.dfclose = None
+      self.lower_bound = lower_bound
+      self.upper_bound = upper_bound
 
-    if lower_bound >= upper_bound:
-      self.boundfail = True
+    except Exception as e:
+      print(f"Error in Portfolio intializer function: {e}")
+      return None
 
   def get_data(self, period:str=None, start_date:str=None, end_date:str=None):
     """
-    Downloads the portfolios adjusted closes either by 'period' or 'start_date' and 'end_date'.
-    Only one method of date input should be provided.
-    Data downloaded should be big enough to handle calculations.
+    Returns a dataframe of the historical adjusted close prices of the assets.
+    - Only one method of date input should be provided, either 'period' or 'start_date' and 'end_date'.
+    - Length of time series should be large enough to handle metric calculations.
+
+    Parameters:
+    - period: yfinance time period (e.g., '3mo', '1y', '3y', '5y', 'ytd', 'max').
+    - start_date: Start date of the time series. YYYY-MM-DD format.
+    - end_date: End date of the time series. YYYY-MM-DD format.
     """
     try:
-      if self.boundfail:
-        raise ValueError("Lower bound cannot be greater or equal to upper bound.")
-
       if period and (start_date or end_date): #checks if both methods of date input are used
         raise ValueError("Provide either 'period' OR both 'start_date' and 'end_date' -- not both.")
 
@@ -41,7 +46,7 @@ class Portfolio:
 
       if self.dfclose.empty or self.dfclose is None:
         raise ValueError("Downloaded price data is empty or unavailable.")
-      elif len(self.dfclose) <= 2: 
+      elif len(self.dfclose) <= 2:
         raise ValueError("Downloaded price data is too short.")
       elif len(self.dfclose) < 21: #average trading days in a month
         print("Warning: Limited price history may lead to unreliable metrics.")
@@ -55,7 +60,8 @@ class Portfolio:
     """
     Returns a list of weights for the portfolio.
 
-    type_weight: Input 'eq' for equal-weighted portfolio or 'opt' for optimized weights based on sharpe-ratio
+    Parameters:
+    - type_weight: Input 'eq' for equal-weighted portfolio or 'opt' for optimized weights based on the Sharpe-Ratio
     """
     try:
       dfclose = self.dfclose
@@ -85,14 +91,11 @@ class Portfolio:
 
       if type_weight.strip().lower() == "eq":
         self.weights = [float(i) for i in weights]
-        if sum(self.weights) > 1:
-          raise ValueError("Sum of portfolio weights are greater than 1. Lower bound may be too high.")
       elif type_weight.strip().lower() == "opt":
         optimized_weights = minimize(neg_sharpe, weights, method="SLSQP", bounds=bounds, constraints=constraints)
         self.weights = [round(float(i),4) for i in optimized_weights.x]
       else:
         raise ValueError("Select a valid input for 'type_weight' -- either 'eq' or 'opt'.")
-      
 
       return self.weights, None
 
