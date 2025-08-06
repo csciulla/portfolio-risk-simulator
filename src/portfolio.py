@@ -1,22 +1,20 @@
 import pandas as pd
 import numpy as np
 import yfinance as yf
+import plotly.graph_objects as go
 from scipy.optimize import minimize
 
 class Portfolio:
   def __init__(self, portfolio:list,  lower_bound:float, upper_bound:float):
-    try:
-      if lower_bound >= upper_bound:
-        raise ValueError("Lower bound must be less than upper bound.")
+    if lower_bound >= upper_bound:
+      raise ValueError("Lower bound must be less than upper bound.")
 
-      self.portfolio = portfolio
-      self.weights = None
-      self.dfclose = None
-      self.lower_bound = lower_bound
-      self.upper_bound = upper_bound
+    self.portfolio = portfolio
+    self.weights = None
+    self.dfclose = None
+    self.lower_bound = lower_bound
+    self.upper_bound = upper_bound
 
-    except Exception as e:
-      return str(e)
 
   def get_data(self, period:str=None, start_date:str=None, end_date:str=None):
     """
@@ -108,7 +106,36 @@ class Portfolio:
 
     except Exception as e:
       return None, str(e)
+  
+  def plot_pie(self):
+    """
+    Plots a pie chart of the portfolio weight allocation using Plotly.
+    """
+    try:
+      if self.weights == None:
+        raise ValueError("There are no portfolio weights to plot.")
+      
+      tickers = list(self.portfolio)
+      weights = self.weights
 
+      fig = go.Figure(data=[go.Pie(labels=tickers, values=weights, hole=0)])
+
+      fig.update_layout(
+        title_text="Portfolio Allocation",
+        title_x = 0.4,
+        showlegend=False,
+        margin=dict(t=40, b=0, l=0, r=0)
+      )
+      fig.update_traces(
+        textinfo='percent+label',
+        marker=dict(colors='blue', line=dict(color='#000000', width=1))
+      )
+      return fig, None
+        
+    except Exception as e:
+      return None, str(e)  
+  
+  
 if __name__ == "__main__":
     port = Portfolio(["AAPL", "XOM","JPM"], 0.0, 0.5)
     df = port.get_data(period="5y")
