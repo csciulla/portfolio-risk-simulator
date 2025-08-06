@@ -106,8 +106,7 @@ class SimulationAnalyzer:
             self.batches[label] = sims_returns
         
         except Exception as e:
-            print(f"Error in add_simulation: {e}")
-            return None
+            return None, str(e)
 
     def all_metrics(self, weights:list[float]):
         """
@@ -137,11 +136,10 @@ class SimulationAnalyzer:
                 self.all_metrics_df[label] = pd.DataFrame(data=all_metrics, index=sims_index)
                 self.all_PCR_df[label] = pd.DataFrame(data=all_PCR, index=sims_index)
 
-            return self.all_metrics_df, self.all_PCR_df
+            return (self.all_metrics_df, self.all_PCR_df), None
         
         except Exception as e:
-            print(f"Error in all_metrics function: {e}")
-            return None
+            return None, str(e)
         
     def visualize_metrics(self):
 
@@ -166,8 +164,6 @@ class SimulationAnalyzer:
             fig.suptitle("KDE Comparison of Portfolio Metrics Across Simulations", fontsize=16)
             fig.legend(labels=self.all_metrics_df.keys())
             plt.show()
-               
-                
+                 
         except Exception as e:
-            print(f"Error in visualize metrics: {e}")
-            return None
+            return None, str(e)

@@ -16,8 +16,7 @@ class Portfolio:
       self.upper_bound = upper_bound
 
     except Exception as e:
-      print(f"Error in Portfolio intializer function: {e}")
-      return None
+      return str(e)
 
   def get_data(self, period:str=None, start_date:str=None, end_date:str=None):
     """
@@ -43,6 +42,9 @@ class Portfolio:
         self.dfclose = yf.download(self.portfolio, start=start_date, end=end_date, progress=False, auto_adjust=False)["Adj Close"]
       else:
         raise ValueError("You must provide either a 'period' or both 'start_date' and 'end_date'.")
+      
+      NaN_count = self.dfclose.isna().sum().sum()
+      df_size = self.dfclose.size
 
       if self.dfclose.empty or self.dfclose is None:
         raise ValueError("Downloaded price data is empty or unavailable.")
@@ -50,6 +52,11 @@ class Portfolio:
         raise ValueError("Downloaded price data is too short.")
       elif len(self.dfclose) < 21: #average trading days in a month
         print("Warning: Limited price history may lead to unreliable metrics.")
+      
+      if NaN_count >= df_size//10:
+        print("Warning: Some price data does not exist within the downloaded time period. Proceed with caution.")
+      elif NaN_count == df_size:
+        raise ValueError("All downloaded data is NaN. Check the ticker symbols and date range.")
 
       return self.dfclose, None
 
