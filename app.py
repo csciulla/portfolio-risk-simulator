@@ -80,32 +80,48 @@ def portfolio_config():
                     port = Portfolio(tickers, lbound, ubound)
                     df, df_error = port.get_data(period=period, start_date=start_date, end_date=end_date)
                     weights, w_error = port.get_weights(type_weight=type_weight)
+                    _, norm_error = port.normalize_portfolio_data()
+                    _, c_error = port.get_portfolio_colors()
 
                     if df_error:
-                        st.error(f"Data download failed: {df_error}")
+                        st.error(f"Error in downloading portfolio data: {df_error}")
                     elif w_error:
-                        st.error(f"Weight calculation failed: {w_error}")
+                        st.error(f"Error in calculating weights: {w_error}")
+                    elif norm_error:
+                        st.error(f"Error in normalizing portfolio data: {norm_error}")
+                    elif c_error:
+                        st.error(f"Error in constructing asset colors: {c_error}")
                     else:
                         st.session_state.df = df
                         st.session_state.port = port
                         st.session_state.weights = weights
-                        st.success("Portfolio data successfully downloaded!")
+                        #st.success("Portfolio data successfully downloaded!")
                                         
                 except Exception as e:
                     st.error(f"Portfolio initalization failed: {e}")    
-
-    #Weight Pie Chart     
+  
     with pcol2:
+        #Weight Pie Chart
         if st.session_state.df is None:
             st.info("📊 Portfolio pie chart will appear here once data is downloaded.")
-        else:
+        elif st.session_state.port is not None:
             pie, pie_error = port.plot_pie()
             if pie_error:
-                st.error(f"Error in plotting the pie chart: {pie_error}")
+                st.error(f"Error in plotting weight allocation: {pie_error}")
             else:
                 st.plotly_chart(pie, use_container_width=True)
 
+    #Portofolio Line Chart
+    if st.session_state.df is None:
+         st.info("📊 Portfolio line chart will appear here once data is downloaded.")
+    elif st.session_state.port is not None:
+        line, line_error = port.plot_line()
+        if line_error:
+            st.error(f"Error in plotting portfolio data: {line_error}")
+        else:
+            st.plotly_chart(line, use_container_width=True)
 
+        
 
 def simulation_config():
     """ 
