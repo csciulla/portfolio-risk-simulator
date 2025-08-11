@@ -67,12 +67,14 @@ class Portfolio:
       return None, str(e)
     
 
-  def get_weights(self, type_weight:str):
+  def get_weights(self, type_weight:str, custom_weights:list[float]=None):
     """
     Returns a list of weights for the portfolio.
 
     Parameters:
-    - type_weight: Input 'eq' for equal-weighted portfolio or 'opt' for optimized weights based on the Sharpe-Ratio
+    - type_weight: Input 'eq' for equal-weighted portfolio or 'opt' for optimized weights based on the Sharpe-Ratio.
+                   Input 'custom' if you want to define your own weights; input them in the 'custom_weights' parameter.
+    - custom: Input custom weights; optional
     """
     try:
       if self.portfolio_df is None or self.portfolio_df.empty:
@@ -84,6 +86,7 @@ class Portfolio:
       log_returns = np.log(self.portfolio_df/self.portfolio_df.shift()).dropna()
 
       #Calculate initial portfolio metrics
+      tickers = list(self.portfolio)
       weights = np.repeat(1/len(self.portfolio), len(self.portfolio))
       expected_returns = log_returns.mean()*252
       cov_matrix = log_returns.cov()*252
@@ -102,6 +105,15 @@ class Portfolio:
       elif type_weight.strip().lower() == "opt":
         optimized_weights = minimize(neg_sharpe, weights, method="SLSQP", bounds=bounds, constraints=constraints)
         self.weights = [round(float(i),4) for i in optimized_weights.x]
+      elif type_weight.strip().lower() == "custom":
+        if custom_weights is None:
+          raise ValueError("Please enter weights if custom weights are desired.")
+        elif sum(custom_weights) != 1.0:
+          raise ValueError("Custom weights must sum up to 1.")
+        elif len(custom_weights) != len(tickers):
+          raise ValueError("Number of weights should match number of assets")
+        else:
+          self.weights = custom_weights
       else:
         raise ValueError("Select a valid input for 'type_weight' -- either 'eq' or 'opt'.")
 
@@ -170,8 +182,6 @@ class Portfolio:
       fig = go.Figure(data=[go.Pie(labels=tickers, values=weights, hole=0)])
 
       fig.update_layout(
-        title_text="Portfolio Allocation",
-        title_x = 0.33,
         margin=dict(t=40, b=0, l=0, r=0)
       )
       fig.update_traces(
@@ -209,7 +219,6 @@ class Portfolio:
                 hovertemplate=f'{ticker}: %{{y:.2f}}<extra></extra>'
             ))
         fig.update_layout(
-          title='Normalized Portfolio Performance',
           xaxis_title='Date',
           yaxis_title='Normalized Price',
           hovermode='x unified',
