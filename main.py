@@ -3,9 +3,12 @@ from src.simulation import monte_carlo, historical, FactorStress
 import streamlit as st
 import streamlit_shadcn_ui as ui
 import pandas as pd
+from datetime import datetime
+import time
 
 #Page config and session state initalization
 st.set_page_config(page_title = "Portfolio Risk Simulator", layout="wide")
+
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'port' not in st.session_state:
@@ -17,20 +20,109 @@ if 'pie' not in st.session_state:
 if 'line' not in st.session_state:
     st.session_state.line = None
 
+if 'portfolios' not in st.session_state:
+    st.session_state.portfolios = {}
+if 'portfolio_counter' not in st.session_state:
+    st.session_state.portfolio_counter = 1
+if 'current_portfolio' not in st.session_state:
+    st.session_state.current_portfolio = None
+
+def home():
+    """
+    Creates the home page for portfolio initalization and user introduction.
+    """
+    st.title("Portfolio Risk Simulator")
+
+    with st.container(border=True):
+        port_ct = st.session_state.portfolio_counter
+        placeholder_name = f"Portfolio {port_ct}"
+        name = st.text_input("**Input a Portfolio Name:**", placeholder=placeholder_name, max_chars=30)
+        init_port = st.button("Create Portfolio", use_container_width=True)
+        if init_port:
+
+            try:
+                portfolios = st.session_state.portfolios
+                if not name:
+                    name = placeholder_name
+                elif name in portfolios.keys():
+                    raise ValueError("That portfolio name has already been taken. Try again.")
+            
+            except Exception as e:
+                st.error(str(e), icon="❌")
+                return
+            
+            created_date = datetime.now()
+            
+            portfolios[name] = {
+                'created_date': created_date,
+                'config_complete': False,
+                'sim_complete': False,
+                'metrics_complete': False,
+                'scenarios': {}
+                }
+
+            st.session_state.portfolio_counter += 1
+            st.session_state.current_portfolio = name
+            st.success(f"Portfolio '{name}' created succesfully!", icon="✅")
+            time.sleep(1)
+            st.rerun()
+
 
 def render_sidebar():
     """
     Creates sidebar for UI.
     """
     with st.sidebar:
-        st.title("Portfolio Risk Simulator")
-        page = st.radio('' ,["Portfolio Configuration","Simulation Configuration","Metrics & Visualization"])
-        return page
+        #Home Button
+        home_button = st.button("🏠 Home", key='home_btn', use_container_width=True,
+                                type='primary' if st.session_state.current_page == 'home' else 'secondary')
+        if home_button:
+            st.session_state.current_page = 'home'
+            st.rerun()
+        
+        portfolios = st.session_state.portfolios
+        if portfolios.keys() is not None:
+
+                for name in portfolios.keys():
+                    st.subheader(f'📁 {name}')
+
+                    config_key = f"config_{name}"
+                    sim_key = f"sim_{name}"
+                    metrics_key = f"metrics_{name}"
+
+                    #Configuration Button
+                    config_button = st.button("⚙️ Configuration", key=config_key, use_container_width=True,
+                                              type='primary' if st.session_state.current_page == config_key else 'secondary')
+                    if config_button:
+                        st.session_state.current_page = config_key
+                        st.session_state.current_portfolio = name
+                        portfolios[name]['config_complete'] = True
+                        st.rerun()
+
+                    #Simulation Button
+                    if portfolios[name]['config_complete']:
+                        sim_button = st.button("🎛️ Simulation", key=sim_key, use_container_width=True,
+                                                type='primary' if st.session_state.current_page == sim_key else 'secondary')
+                        if sim_button:
+                            st.session_state.current_page = sim_key
+                            st.session_state.current_portfolio = name
+                            portfolios[name]['sim_complete'] = True
+                            st.rerun()
+
+                    #Metrics Button
+                    if portfolios[name]['sim_complete']:
+                        sim_button = st.button("📊 Metrics", key=metrics_key, use_container_width=True,
+                                                type='primary' if st.session_state.current_page == metrics_key else 'secondary')
+                        if sim_button:
+                            st.session_state.current_page = metrics_key
+                            st.session_state.current_portfolio = name
+                            portfolios[name]['metrics_complete'] = True
+                            st.rerun()
 
 
 def render_info_box(message: str, height: int = 300, margin_top: str = "0px", max_width: str = "900px",):
     """
-    Draw a centered info-like box (theme-aware fallback), vertically centered inside a flex container of given height.
+    Draw a centered info-like box, vertically centered inside a flex container of given height.
 
     Parameters: 
     - height: px height of the placeholder container
@@ -227,15 +319,20 @@ def simulation_config():
                         
             factors = [factor_convert[factor] for factor in factors_expanded_select] 
 
-
 def main():
-    page = render_sidebar()
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 'home'
 
-    if page == 'Portfolio Configuration':
+    render_sidebar()
+
+    current_page = st.session_state.current_page
+    if current_page == 'home':
+        home()
+    elif current_page.startswith('config_'):
         portfolio_config()
-    elif page == 'Simulation Configuration':
+    elif current_page.startswith('sim_'):
         simulation_config()
-    elif page == 'Metrics & Visualization':
+    elif current_page.startswith('metrics_'):
         pass
 
 if __name__ == '__main__':
