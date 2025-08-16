@@ -9,17 +9,6 @@ import time
 #Page config and session state initalization
 st.set_page_config(page_title = "Portfolio Risk Simulator", layout="wide")
 
-if 'df' not in st.session_state:
-    st.session_state.df = None
-if 'port' not in st.session_state:
-    st.session_state.port = None
-if 'weights' not in st.session_state:
-    st.session_state.weights = None
-if 'pie' not in st.session_state:
-    st.session_state.pie = None
-if 'line' not in st.session_state:
-    st.session_state.line = None
-
 if 'portfolios' not in st.session_state:
     st.session_state.portfolios = {}
 if 'portfolio_counter' not in st.session_state:
@@ -56,6 +45,17 @@ def home():
             portfolios[name] = {
                 'created_date': created_date,
                 'config_complete': False,
+                'configs': {
+                    'tickers': None,
+                    'timeframe': None,
+                    'weight_allocation': {'method': None,
+                                          'lbound': None,
+                                          'ubound': None},
+                    'df': None,
+                    'weights': None,
+                    'pie': None,
+                    'line': None,
+                },
                 'sim_complete': False,
                 'metrics_complete': False,
                 'scenarios': {}
@@ -95,8 +95,7 @@ def render_sidebar():
                                               type='primary' if st.session_state.current_page == config_key else 'secondary')
                     if config_button:
                         st.session_state.current_page = config_key
-                        st.session_state.current_portfolio = name
-                        portfolios[name]['config_complete'] = True
+                        st.session_state.current_portfolio = name 
                         st.rerun()
 
                     #Simulation Button
@@ -106,21 +105,19 @@ def render_sidebar():
                         if sim_button:
                             st.session_state.current_page = sim_key
                             st.session_state.current_portfolio = name
-                            portfolios[name]['sim_complete'] = True
                             st.rerun()
 
                     #Metrics Button
                     if portfolios[name]['sim_complete']:
-                        sim_button = st.button("📊 Metrics", key=metrics_key, use_container_width=True,
+                        metrics_button = st.button("📊 Metrics", key=metrics_key, use_container_width=True,
                                                 type='primary' if st.session_state.current_page == metrics_key else 'secondary')
-                        if sim_button:
+                        if metrics_button:
                             st.session_state.current_page = metrics_key
                             st.session_state.current_portfolio = name
-                            portfolios[name]['metrics_complete'] = True
                             st.rerun()
 
 
-def render_info_box(message: str, height: int = 300, margin_top: str = "0px", max_width: str = "900px",):
+def render_info_box(message:str, height:int = 300, margin_top:str = "0px", max_width:str = "900px",):
     """
     Draw a centered info-like box, vertically centered inside a flex container of given height.
 
@@ -160,12 +157,214 @@ def render_info_box(message: str, height: int = 300, margin_top: str = "0px", ma
         unsafe_allow_html=True,
     )
 
+def render_ticker_input(portfolios:dict, name:str):
+    """
+    Renders portfolio ticker input.
+    Displays locked state with previously selected values after portfolio download.
+
+    Parameters:
+    - portfolios: Dictionary containing all characteristics for each portfolio that the user has defined
+    - name: String of the current portfolio name
+    """
+    if portfolios[name]['configs']['tickers'] is None:
+        tickers_input = st.text_input("**Enter Portfolio Tickers:**", 
+                                      placeholder='AAPL, MSFT, GOOG, TSLA', 
+                                      help="Enter stock symbols seperated by commas")
+        tickers = [ticker.strip().upper() for ticker in tickers_input.split(",")]
+    
+    #Display locked state if tickers already chosen 
+    else:
+        tickers = st.text_input("**Enter Portfolio Tickers:**",
+                                value=", ".join(portfolios[name]['configs']['tickers']),
+                                disabled=True,
+                                help="Previously configured tickers")
+        
+    return tickers
+
+
+def render_timeframe_input(portfolios:dict, name:str):
+    """
+    Renders data retrieval method selection and timeframe configuration.
+    Displays locked state with previously selected values after portfolio download.
+
+    Parameters:
+    - portfolios: Dictionary containing all characteristics for each portfolio that the user has defined
+    - name: String of the current portfolio name
+    """
+    month_choices = [f'{i}mo' for i in range(1,12)]
+    year_choices = [f'{j}y' for j in range(1,51)]
+    full_choices = month_choices + year_choices + ['ytd', 'max']
+    
+    if portfolios[name]['configs']['timeframe'] is None:
+        time_select = st.radio("**Data Retrieval Method:**", ['Quick Select', 'Custom Date Range'], horizontal=True)
+        
+        if time_select == 'Quick Select':
+            start_date = end_date = None
+            period = st.select_slider("Choose a period:", full_choices)
+
+        elif time_select == 'Custom Date Range':
+            period = None
+            dcol1, dcol2 = st.columns(2)
+            with dcol1:
+                start_date = st.date_input("Enter start date:")
+            with dcol2:
+                end_date = st.date_input("Enter end date:")
+
+    #Display locked state if timeframe already chosen
+    else:
+        if isinstance(portfolios[name]['configs']['timeframe'], str):
+            start_date = end_date = None
+            st.radio("**Data Retrieval Method:**", 
+                     options=['Quick Select', 'Custom Date Range'], 
+                     index=0,
+                     horizontal=True,
+                     disabled=True, 
+                     help="Previously chosen retrieval method")
+                    
+            period = st.select_slider("Choose a period:", 
+                                      full_choices, 
+                                      value=portfolios[name]['configs']['timeframe'],
+                                      disabled=True)
+
+        elif isinstance(portfolios[name]['configs']['timeframe'], tuple):
+            period = None
+            st.radio("**Data Retrieval Method:**", 
+                     options=['Quick Select', 'Custom Date Range'],
+                     index=1,
+                     horizontal=True,
+                     disabled=True, 
+                     help="Previously chosen retrieval method")
+                    
+            dcol1, dcol2 = st.columns(2)
+            with dcol1:
+                start_date = st.date_input("Enter start date:",
+                                           value=portfolios[name]['configs']['timeframe'][0],
+                                           disabled=True,
+                                           help="Previously chosen start date")
+            with dcol2:
+                end_date = st.date_input("Enter end date:",
+                                         value=portfolios[name]['configs']['timeframe'][1],
+                                         disabled=True,
+                                         help="Previosuly chosen end date")
+                    
+    return period, start_date, end_date
+
+
+def render_weight_input(portfolios:dict, name:str, tickers:list):
+    """
+    Renders weight allocation components.
+    Displays locked state with previously selected values after portfolio download.
+    """
+    
+    #Enter weights 
+    if portfolios[name]['configs']['weight_allocation']['method'] is None: 
+        weights_input = st.radio("**Weight Allocation:**",
+                                 ['Equal Weighted', 'Optimized', 'Custom'],
+                                 horizontal=True, 
+                                 help="Optimized maximizes the weights according to the Sharpe Ratio")
+        
+        custom_weights_list = None
+        lbound, ubound = 0.0, 1.0
+        if weights_input == 'Equal Weighted':
+            type_weight = 'eq'
+        elif weights_input == 'Optimized':
+            type_weight = 'opt'
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                lbound = st.number_input("Enter lower bound:", min_value=0.0, max_value=0.5, value=0.0)
+            with bcol2:
+                ubound = st.number_input("Enter upper bound:", min_value=0.0, max_value=1.0, value=0.5)
+        elif weights_input == 'Custom':
+            type_weight = 'custom'
+            placeholder_weights = ', '.join([f'{1/len(tickers)}']*len(tickers))
+            custom_weights = st.text_input("Enter weights:", placeholder=placeholder_weights, help="Enter weights comma seperated")
+            custom_weights_list = [pd.to_numeric(weight.strip()) for weight in custom_weights.split(",")]
+        
+    #Display locked state if weights already chosen
+    else:
+        custom_weights_list = None
+        lbound, ubound = 0.0, 1.0
+        if portfolios[name]['configs']['weight_allocation']['method'] == 'eq':
+            type_weight = 'eq'
+            st.radio("**Weight Allocation:**",
+                     ['Equal Weighted', 'Optimized', 'Custom'],
+                     index=0,
+                     disabled=True,
+                     horizontal=True,
+                     help="Previously chosen weight allocation method")
+                    
+        elif portfolios[name]['configs']['weight_allocation']['method'] == 'opt':
+            type_weight = 'opt'
+            st.radio("**Weight Allocation:**",
+                     ['Equal Weighted', 'Optimized', 'Custom'],
+                     index=1,
+                     disabled=True,
+                     horizontal=True,
+                     help="Previously chosen weight allocation method")
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                lbound = st.number_input("Enter lower bound:", 
+                                         value=portfolios[name]['configs']['weight_allocation']['lbound'],
+                                         disabled=True,
+                                         help="Previously chosen lower bound")
+            with bcol2:
+                ubound = st.number_input("Enter upper bound:", 
+                                         value=portfolios[name]['configs']['weight_allocation']['ubound'],
+                                         disabled=True,
+                                         help="Previously chosen upper bound")
+                    
+        elif portfolios[name]['configs']['weight_allocation']['method'] == 'custom':
+            type_weight = 'custom'
+            st.radio("**Weight Allocation:**",
+                     ['Equal Weighted', 'Optimized', 'Custom'],
+                     index=2,
+                     disabled=True,
+                     horizontal=True,
+                     help="Previously chosen weight allocation method")
+            custom_weights = ', '.join([str(weight) for weight in portfolios[name]['configs']['weights']])
+            custom_weights_list = st.text_input("**Enter Weights:**", 
+                                                value=custom_weights,
+                                                disabled=True,
+                                                help="Previously chosen custom weights")
+            
+    return type_weight, lbound, ubound, custom_weights_list
+
+
+def render_pie(portfolios:dict, name:str):
+    """
+    Renders pie chart.
+    Returns an info box before portfolio download.
+    """
+    with st.container(border=True):
+        st.markdown("#### Weight Allocation")
+        if portfolios[name]['configs']['pie'] is None:
+            render_info_box("📊 Portfolio pie chart will appear here once data is downloaded.",
+                            height=360, margin_top="0px")
+        else:
+            st.plotly_chart(portfolios[name]['configs']['pie'], use_container_width=True)
+
+    
+def render_line(portfolios:dict, name:str):
+    """ 
+    Renders line chart.
+    Returns an info box before portfolio download.
+    """
+    with st.container(border=True):
+        st.markdown("#### Normalized Portfolio Performance")
+        if portfolios[name]['configs']['line'] is None:
+            render_info_box("📈 Portfolio line chart will appear here once data is downloaded.",
+                        height=120, margin_top="18px")
+        else:
+            st.plotly_chart(portfolios[name]['configs']['line'], use_container_width=True)
+    
 
 def portfolio_config():
     """ 
     UI for Portfolio Configuration page.
     """
     st.header("Portfolio Configuration", divider=True)
+    portfolios = st.session_state.portfolios
+    name = st.session_state.current_portfolio
 
     pcol1, pcol2 = st.columns(2)
 
@@ -173,50 +372,10 @@ def portfolio_config():
     with pcol1:
         with st.container(border=True):
             st.markdown("#### Input Parameters")
-        
-            #Enter tickers
-            tickers_input = st.text_input("**Enter Portfolio Tickers:**", 
-                                        placeholder='AAPL, MSFT, GOOG, TSLA', 
-                                        help="Enter stock symbols seperated by commas")
-            tickers = [ticker.strip().upper() for ticker in tickers_input.split(",")]
 
-            #Enter timeframe
-            time_select = st.radio("**Data Retrieval Method:**", ['Quick Select', 'Custom Date Range'], horizontal=True)
-            if time_select == 'Quick Select':
-                start_date = end_date = None
-                month_choices = [f'{i}mo' for i in range(1,12)]
-                year_choices = [f'{j}y' for j in range(1,51)]
-                full_choices = month_choices + year_choices + ['ytd', 'max']
-
-                period = st.select_slider("Choose a period:", full_choices)
-
-            elif time_select == 'Custom Date Range':
-                period = None
-                dcol1, dcol2 = st.columns(2)
-                with dcol1:
-                    start_date = st.date_input("Enter start date:")
-                with dcol2:
-                    end_date = st.date_input("Enter end date:")
-
-            #Enter weights 
-            weights_input = st.radio("**Weight Allocation:**",
-                                        ['Equal Weighted', 'Optimized', 'Custom'],
-                                        horizontal=True, help="Optimized maximizes the weights according to the Sharpe Ratio")
-            lbound, ubound = 0.0, 1.0
-            if weights_input == 'Equal Weighted':
-                type_weight = 'eq'
-            elif weights_input == 'Optimized':
-                type_weight = 'opt'
-                bcol1, bcol2 = st.columns(2)
-                with bcol1:
-                    lbound = st.number_input("Enter lower bound:", min_value=0.0, max_value=0.5, value=0.0)
-                with bcol2:
-                    ubound = st.number_input("Enter upper bound:", min_value=0.0, max_value=1.0, value=0.5)
-            elif weights_input == 'Custom':
-                type_weight = 'custom'
-                placeholder_weights = ', '.join([f'{1/len(tickers)}']*len(tickers))
-                custom_weights = st.text_input("Enter weights:", placeholder_weights, help="Enter weights comma seperated")
-                custom_weights_list = [float(weight.strip()) for weight in custom_weights.split(",")]
+            tickers = render_ticker_input(portfolios, name)
+            period, start_date, end_date = render_timeframe_input(portfolios, name)
+            type_weight, lbound, ubound, custom_weights_list = render_weight_input(portfolios, name, tickers)
 
             #Download button
             if st.button("Download Portfolio Data", use_container_width=True):
@@ -255,36 +414,36 @@ def portfolio_config():
                             st.error(f"Error in building portfolio data line chart: {line_error}")
                         else:
                             # Store in session state
-                            st.session_state.df = df
-                            st.session_state.port = port
-                            st.session_state.weights = weights
-                            st.session_state.pie = pie_chart
-                            st.session_state.line = line_chart
+                            portfolios =  st.session_state.portfolios
+                            name = st.session_state.current_portfolio
+                            portfolios[name]['config_complete'] = True
+                            portfolios[name]['configs']['tickers'] = tickers
+
+                            if period and start_date is None and end_date is None:
+                                portfolios[name]['configs']['timeframe'] = period
+                            else:
+                                portfolios[name]['configs']['timeframe'] = start_date, end_date
+
+                            portfolios[name]['configs']['weight_allocation']['method'] = type_weight
+                            portfolios[name]['configs']['weight_allocation']['lbound'] = lbound
+                            portfolios[name]['configs']['weight_allocation']['ubound'] = ubound
+                            portfolios[name]['configs']['df'] = df
+                            portfolios[name]['configs']['weights'] = weights
+                            portfolios[name]['configs']['pie'] = pie_chart
+                            portfolios[name]['configs']['line'] = line_chart
                             
                             st.success("Portfolio data downloaded successfully!", icon="✅")
+                            time.sleep(1)
+                            st.rerun()
 
                     except Exception as e:
                         st.error(f"Portfolio initalization failed: {str(e)}")
 
     with pcol2:
-        #Weight Pie Chart
-        with st.container(border=True):
-            st.markdown("#### Weight Allocation")
-            if st.session_state.pie is None:
-                render_info_box("📊 Portfolio pie chart will appear here once data is downloaded.",
-                            height=360, margin_top="0px")
-            else:
-                st.plotly_chart(st.session_state.pie, use_container_width=True)
-
-    #Portofolio Line Chart
-    with st.container(border=True):
-        st.markdown("#### Normalized Portfolio Performance")
-        if st.session_state.line is None:
-            render_info_box("📈 Portfolio line chart will appear here once data is downloaded.",
-                        height=120, margin_top="18px")
-        else:
-            st.plotly_chart(st.session_state.line, use_container_width=True)
-
+        render_pie(portfolios, name)
+    
+    render_line(portfolios, name)
+        
 
 def simulation_config():
     """ 

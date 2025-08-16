@@ -40,8 +40,8 @@ class Portfolio:
         period = period.strip()
         self.portfolio_df = yf.download(self.portfolio, period=period, progress=False, auto_adjust=False)["Adj Close"]
       elif start_date and end_date:
-        start_date = start_date.strip()
-        end_date = end_date.strip()
+        start_date = start_date
+        end_date = end_date
         self.portfolio_df = yf.download(self.portfolio, start=start_date, end=end_date, progress=False, auto_adjust=False)["Adj Close"]
       else:
         raise ValueError("You must provide either a 'period' or both 'start_date' and 'end_date'.")
