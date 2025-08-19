@@ -15,6 +15,8 @@ if 'portfolio_counter' not in st.session_state:
     st.session_state.portfolio_counter = 1
 if 'current_portfolio' not in st.session_state:
     st.session_state.current_portfolio = None
+if 'current_scenario' not in st.session_state:
+    st.session_state.current_scenario = None
 
 def home():
     """
@@ -58,6 +60,7 @@ def home():
                 },
                 'sim_complete': False,
                 'metrics_complete': False,
+                'scenario_ctr': 0,
                 'scenarios': {}
                 }
 
@@ -156,6 +159,8 @@ def render_info_box(message:str, height:int = 300, margin_top:str = "0px", max_w
         """,
         unsafe_allow_html=True,
     )
+
+#------Portfolio Configuration Functions------
 
 def render_ticker_input(portfolios:dict, name:str):
     """
@@ -445,38 +450,215 @@ def portfolio_config():
     render_line(portfolios, name)
         
 
+#------Simulation Configuration Functions------
+
+def render_scenario(portfolios:dict, name:str):
+    """
+    Renders the scenario builder.
+    Displays locked state with previously selected values after confirmation.
+    """
+    scenario_name = st.session_state.current_scenario
+    scenarios = portfolios[name]['scenarios']
+
+    #New scenario creation
+    if scenario_name is None or scenario_name not in scenarios:
+        scenario_placeholder_name = f"Scenario {portfolios[name]['scenario_ctr']}"
+        scenario_name_input = st.text_input("**Input Scenario Name:**", placeholder=scenario_placeholder_name, max_chars=30)
+        st.caption("_This will allow you to distingiuish between multiple risk scenarios within the same portfolio._")
+
+        sim_method = st.radio("**Simulation Method:**", ['Monte Carlo', 'Historical Replay'], horizontal=True, index=0)
+        if sim_method == 'Monte Carlo':
+            #Initialize # of days and # of sims
+            mccol1, mccol2 = st.columns(2)
+            with mccol1:
+                sims = st.number_input("Enter the number of simulations:", min_value=1, max_value=1000, value=100)
+            with mccol2:
+                T = st.number_input("Enter the number of days in each simulation:", min_value=25, max_value=1000, value=252)
+
+            #Input risk profile
+            regime_options = ['Low', 'Medium', 'High']
+            regime = st.pills("Current State of the Market:**", regime_options)
+            level_options = ['Mild', 'Moderate', 'Severe', 'Tail Risk', 'Regulatory']
+            level = st.pills("**Severity of Market State:**", level_options)
+
+            #Confirmation
+            confirm = st.button("Confirm Scenario", use_container_width=True)
+            if confirm:
+                final_scenario_name = scenario_name_input if scenario_name_input else scenario_placeholder_name
+
+                #Store in session state
+                scenarios[final_scenario_name] = {
+                    'sim_method': sim_method,
+                    '# sims': sims,
+                    '# days': T,
+                    'regime': regime,
+                    'level': level,
+                    'confirmed': True    
+                    }
+                portfolios[name]['scenario_ctr'] += 1
+                st.session_state.current_scenario = final_scenario_name
+                st.success("Scenario successfully created!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+        
+        if sim_method == 'Historical Replay':
+            #Choose crisis event
+            crisis_options = {'Dot-Com Bubble': 'DOT-COM',
+                              '2008 Global Finanical Crisis': '2008 GFC',
+                              '2011 Euro Zone Crisis': '2011 Euro',
+                              'COVID-19': 'COVID',
+                              '2022 Inflation Crash': '2022 Inf'}
+            
+            crisis_expanded = st.selectbox("**Select Crisis Event:**", list(crisis_options.keys()))
+            crisis = crisis_options[crisis_expanded]
+
+            #Confirmation
+            confirm = st.button("Confirm Scenario", use_container_width=True)
+            if confirm:
+                final_scenario_name = scenario_name_input if scenario_name_input else scenario_placeholder_name
+     
+                #Store in session state
+                scenarios[final_scenario_name] = {'sim_method': sim_method,
+                                                  'crisis': crisis,
+                                                  'confirmed': True
+                                                  }
+                portfolios[name]['scenario_ctr'] += 1
+                st.session_state.current_scenario = final_scenario_name
+                st.success("Scenario successfully created!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+
+    else:
+        #Display locked state for existing scenario
+        scenario_name = st.text_input("**Input Scenario Name:**", value=scenario_name, disabled=True)
+        st.caption("_This will allow you to distingiuish between multiple risk scenarios within the same portfolio._")
+
+        #Locked Monte Carlo inputs
+        if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
+            st.radio("**Simulation Method:**", ['Monte Carlo', 'Historical Replay'],
+                      horizontal=True, 
+                      index=0, 
+                      disabled=True)
+            
+            mccol1, mccol2 = st.columns(2)
+            with mccol1:
+                st.number_input("Enter the number of simulations:", 
+                                       value=scenarios[scenario_name]['# days'], 
+                                       disabled=True)
+            with mccol2:
+                st.number_input("Enter the number of days in each simulation:",
+                                value=scenarios[scenario_name]['# sims'],
+                                disabled=True)
+            
+            regime_options = ['Low','Medium','High']
+            st.pills("Current State of the Market:**", 
+                     regime_options, 
+                     default=scenarios[scenario_name]['regime'],
+                     disabled=True)
+            
+            level_options = ['Mild', 'Moderate', 'Severe', 'Tail Risk', 'Regulatory']
+            st.pills("**Severity of Market State:**", 
+                     level_options,
+                     default=scenarios[scenario_name]['level'],
+                     disabled=True)
+            
+            st.button("Confirm Scenario", disabled=True, use_container_width=True)
+                
+        #Locked Historical Replay inputs
+        elif scenarios[scenario_name]['sim_method'] == 'Historical Replay':
+            st.radio("**Simulation Method:**", ['Monte Carlo', 'Historical Replay'],
+                     horizontal=True, 
+                      index=1, 
+                      disabled=True)  
+
+            crisis_options = {'Dot-Com Bubble': 'DOT-COM',
+                              '2008 Global Finanical Crisis': '2008 GFC',
+                              '2011 Euro Zone Crisis': '2011 Euro',
+                              'COVID-19': 'COVID',
+                              '2022 Inflation Crash': '2022 Inf'}
+            
+            crisis_display = crisis_options.get(scenarios[scenario_name]['crisis'], scenarios[scenario_name]['crisis'])
+            st.selectbox("**Select Crisis Event:**", 
+                         options=[crisis_display],
+                         index=0,
+                         disabled=True)
+            
+            st.button("Confirm Scenario", disabled=True, use_container_width=True)
+    
+                    
+def render_classification(portfolios:dict, name:str):
+    """ 
+    Renders the classification of each asset in the portfolio based on the factors chosen.
+    Displays locked state with previously selected values after confirmation.
+    """
+    portfolios = st.session_state.portfolios
+    name = st.session_state.current_portfolio
+    scenario_name = st.session_state.current_scenario
+    scenarios = portfolios[name]['scenarios']
+
+    with st.container(border=True):
+        st.markdown("#### Classification")
+
+        if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
+            classifyq = st.checkbox("**Classify your portfolio?**")
+            if classifyq:
+                factors_expanded = st.multiselect("Select Factors:", ['3-factor Fama-French',
+                                                                             '5-factor Fama-French',
+                                                                             'Market Premium',
+                                                                             'Size Premium',
+                                                                             'Value Premium',
+                                                                             'Profitability Factor',
+                                                                             'Investment Factor',
+                                                                             'Momentum Effect'])
+                            
+                factor_convert = {'3-factor Fama-French': 'FF3',
+                                  '5-factor Fama-French': 'FF5',
+                                  'Market Premium': 'Mkt-RF',
+                                  'Size Premium': 'SMB',
+                                  'Value Premium': 'HML',
+                                  'Profitability Factor': 'RMW',
+                                  'Investment Factor': 'CMA',
+                                  'Momentum Effect': 'Mom'}
+                            
+                factors = [factor_convert[factor] for factor in factors_expanded]
+    
+
+
 def simulation_config():
     """ 
     UI for Simulation Configuration page.
     """
-    #Simulation Configuration
-    st.subheader("Simulation Configuration")
-    sim_method = st.radio("**Simulation Method:**", ['Monte Carlo', 'Historical Replay'], horizontal=True)
-    if sim_method == 'Monte Carlo':
-                
-        #Factor setup
-        factors = None
-        classifyq = st.checkbox("**Classify your portfolio?**", )
-        if classifyq:
-            factors_expanded_select = st.multiselect("Select Factors:", ['3-factor Fama-French', 
-                                                                        '5-factor Fama-French',
-                                                                        'Market Premium',
-                                                                        'Size Premium',
-                                                                        'Value Premium',
-                                                                        'Profitability Factor',
-                                                                        'Investment Factor',
-                                                                        'Momentum Effect'])
-                        
-            factor_convert = {'3-factor Fama-French': 'FF3',
-                            '5-factor Fama-French': 'FF5',
-                            'Market Premium': 'Mkt-RF',
-                            'Size Premium': 'SMB',
-                            'Value Premium': 'HML',
-                            'Profitability Factor': 'RMW',
-                            'Investment Factor': 'CMA',
-                            'Momentum Effect': 'Mom'}
-                        
-            factors = [factor_convert[factor] for factor in factors_expanded_select] 
+    st.header("Simulation Configuration", divider=True)
+    portfolios = st.session_state.portfolios
+    name = st.session_state.current_portfolio
+
+    scol1, scol2 = st.columns(2)
+
+    with scol1:
+        with st.container(border=True):
+            st.markdown("#### Scenario Builder")
+            render_scenario(portfolios, name)
+
+    with scol2:
+        render_classification(portfolios, name)
+
+    #Create another scenario
+    scenario_create = st.button("**Create Another Scenario?**", use_container_width=True)
+    if scenario_create:
+        st.session_state.current_scenario = None
+        st.rerun()
+
+    #Scenario selectbox
+    scenarios = list(portfolios[name]['scenarios'].keys())
+    selected_scenario = st.selectbox("**Or select from dropdown:**", 
+                                     options=["Select a scenario..."] + scenarios,
+                                     index=0 if st.session_state.current_scenario is None else scenarios.index(st.session_state.current_scenario) + 1)
+            
+    #Revisit old scenario
+    if selected_scenario != "Select a scenario..." and selected_scenario != st.session_state.current_scenario:
+        st.session_state.current_scenario = selected_scenario
+        st.rerun()
+
 
 def main():
     if 'current_page' not in st.session_state:
