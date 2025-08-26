@@ -122,11 +122,13 @@ def render_sidebar():
                             st.rerun()
 
 
-def render_info_box(message:str, height:int = 300, margin_top:str = "0px", max_width:str = "900px",):
+def render_info_box(message:str, icon:str=None, height:int = 300, margin_top:str = "0px", max_width:str = "900px",):
     """
     Draw a centered info-like box, vertically centered inside a flex container of given height.
 
     Parameters: 
+    - message: The message to be displayed inside the info box
+    - icon: Optional icon to be displayed alongside the message
     - height: px height of the placeholder container
     - margin_top: CSS margin-top value for pushing the whole placeholder down (e.g. "20px")
     - max_width: max width of the info box (keeps it from being full width)
@@ -135,13 +137,11 @@ def render_info_box(message:str, height:int = 300, margin_top:str = "0px", max_w
     txt = "#ffffff"
     border = "#2a6b8d"
 
-    message = message.replace(
-        "📊", '<span style="font-size: 28px;">📊</span>'
-        ).replace(
-        "📈", '<span style="font-size: 28px;">📈</span>'
-        ).replace(
-        "🏷️", '<span style="font-size: 28px;">🏷️</span>')
-    
+    if icon:
+        content = f'<span style="font-size: 28px; margin-right: 8px;">{icon}</span>{message}'
+    else:
+        content = message
+
     st.markdown(
         f"""
         <div style="display:flex; justify-content:center; align-items:center; height:{height}px; margin-top:{margin_top};">
@@ -155,8 +155,9 @@ def render_info_box(message:str, height:int = 300, margin_top:str = "0px", max_w
               max-width: {max_width};
               text-align: center;
               box-shadow: rgba(0,0,0,0.08) 0px 2px 6px;
+              pointer-events: none;
           ">
-            {message}
+            {content}
           </div>
         </div>
         """,
@@ -343,11 +344,11 @@ def render_pie(portfolios:dict, name:str):
     Renders pie chart.
     Returns an info box before portfolio download.
     """
-    with st.container(border=True):
+    with st.container(border=True, height=480):
         st.markdown("#### Weight Allocation")
         if portfolios[name]['configs']['pie'] is None:
-            render_info_box("📊 Portfolio pie chart will appear here once data is downloaded.",
-                            height=360, margin_top="0px")
+            render_info_box("Portfolio pie chart will appear here once data is downloaded.",
+                            icon='📊', height=360, margin_top="0px")
         else:
             st.plotly_chart(portfolios[name]['configs']['pie'], use_container_width=True)
 
@@ -357,12 +358,14 @@ def render_line(portfolios:dict, name:str):
     Renders line chart.
     Returns an info box before portfolio download.
     """
-    with st.container(border=True):
-        st.markdown("#### Normalized Portfolio Performance")
-        if portfolios[name]['configs']['line'] is None:
-            render_info_box("📈 Portfolio line chart will appear here once data is downloaded.",
-                        height=120, margin_top="18px")
-        else:
+    if portfolios[name]['configs']['line'] is None:    
+        with st.container(border=True, height=250):
+            st.markdown("#### Normalized Portfolio Performance")
+            render_info_box("Portfolio line chart will appear here once data is downloaded.",
+                        icon='📈', height=120, margin_top="18px")
+    else:
+        with st.container(border=True):
+            st.markdown("#### Normalized Portfolio Performance")
             st.plotly_chart(portfolios[name]['configs']['line'], use_container_width=True)
     
 
@@ -378,7 +381,7 @@ def portfolio_config():
 
     #Input Parameters
     with pcol1:
-        with st.container(border=True):
+        with st.container(border=True, height=480):
             st.markdown("#### Input Parameters")
 
             tickers = render_ticker_input(portfolios, name)
@@ -573,7 +576,10 @@ def render_classification(portfolios:dict, name:str):
         
         if sim_method == 'Monte Carlo':
             classifyq = st.checkbox("**Classify your portfolio?**")
-            if classifyq:
+            if not classifyq:
+                render_info_box("Classification allows you to understand how your portfolio is exposed to different risk factors.", 
+                                icon='🏷️', max_width='500px', margin_top='20px')
+            else:
                 factors_expanded = ['3-factor Fama-French',
                                     '5-factor Fama-French',
                                     'Market Premium',
@@ -591,7 +597,7 @@ def render_classification(portfolios:dict, name:str):
 
                 return factors
         else:
-            render_info_box("🏷️ Classification inputs are only available for Monte Carlo scenarios")
+            render_info_box("Classification inputs are only available for Monte Carlo scenarios", icon='🏷️')
     
     #Display locked state if scenario exists
     elif scenarios[scenario_name]['sim_method'] == 'Monte Carlo' and scenarios[scenario_name]['factors']:
@@ -619,7 +625,8 @@ def render_classification(portfolios:dict, name:str):
         return scenarios[scenario_name]['factors']
     
     else:
-        render_info_box("🏷️ Classification inputs are only available for Monte Carlo scenarios")
+        render_info_box("Classification inputs are only available for Monte Carlo scenarios", icon='🏷️')
+
         return None
 
 
@@ -633,22 +640,25 @@ def render_shocks(portfolios:dict, name:str, factors:list):
 
     if scenario_name is None or scenario_name not in scenarios:
         shock_ask = st.checkbox("**Would you like to induce factor-stress into the simulation?**")
-        if shock_ask:
+        st.caption("_FF3/FF5 apply uniform stress. Select individual factors for asymmetric shocks._")
 
+        if shock_ask:
             shock_dict = {}
             shock_range = range(-50, 51, 5)
             for f in factors:
                 percents = [f'{s}%' for s in shock_range]
-                shock_dict[f] = st.select_slider(f"{f} Shock", key=f'shock_{f}', options=percents)
-
+                shock_dict[f] = st.select_slider(f"{f} Shock", key=f'shock_{f}', options=percents, value='0%')
+                
             shocks_dict = {key: (float(value.replace('%', ''))/100) for key,value in shock_dict.items()}
 
             return shocks_dict
         
         #No shocks desired
         else:   
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-80px')
+
             return {}
-    
+            
     #Display locked state if scenario already exists
     else:
         #Check if factor shocks exist in the scenario
@@ -656,10 +666,41 @@ def render_shocks(portfolios:dict, name:str, factors:list):
 
         if has_shocks:
             st.checkbox("**Would you like to induce factor-stress into the simulation?**", value=True, disabled=True)
+            st.caption("_FF3/FF5 apply uniform stress. Select individual factors for asymmetric shocks._")
             
+            fs = scenarios[scenario_name]['factor_shocks']
+            fs_copy = scenarios[scenario_name]['factor_shocks'].copy()
             shock_range = range(-50, 51, 5)
             percents = [f'{s}%' for s in shock_range]
-            for factor, shock_value in scenarios[scenario_name]['factor_shocks'].items():
+
+            def uniform_check(mapping, group):
+                """Checks if all values in a group are the same in a mapping (FF3, FF5)"""
+                values = [mapping[f] for f in group]
+                return len(set(values)) == 1
+            
+            FF3_factors = ['Mkt-RF', 'SMB', 'HML']
+            FF5_factors = ['Mkt-RF', 'SMB', 'HML', 'RMW', 'CMA']
+            #Show FF3 instead of individual factors if applicable
+            if set(FF3_factors).issubset(fs.keys()) and uniform_check(fs, FF3_factors) and not any(f in fs for f in ['RMW', 'CMA']):
+                shock = fs['Mkt-RF']
+                st.select_slider('FF3 Shock',
+                                value=f'{int(shock*100)}%',
+                                options=percents,
+                                disabled=True)
+                for factor in FF3_factors:
+                    del fs_copy[factor]
+
+            #Show FF5 instead of individual factors if applicable
+            elif set(FF5_factors).issubset(fs.keys()) and uniform_check(fs, FF5_factors):
+                shock = fs['Mkt-RF']
+                st.select_slider('FF5 Shock',
+                                 value=f'{int(shock*100)}%',
+                                 options=percents,
+                                 disabled=True)
+                for factor in FF5_factors:
+                    del fs_copy[factor]
+
+            for factor, shock_value in fs_copy.items():
                 shock_percentage = f'{int(round(shock_value*100))}%'
                 st.select_slider(f'{factor} Shock', 
                                  value=shock_percentage, 
@@ -670,6 +711,9 @@ def render_shocks(portfolios:dict, name:str, factors:list):
     
         else:
             st.checkbox("**Would you like to induce factor-stress into the simulation?**", value=False, disabled=True)
+            st.caption("_FF3/FF5 apply uniform stress. Select individual factors for asymmetric shocks._")
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-80px')
+
             return {}
 
 
@@ -687,15 +731,19 @@ def simulation_config():
     with scol1:
         with st.container(border=True):
             st.markdown("#### Scenario Builder")
-            
             result = render_scenario(portfolios, name)
             if result:
                 sim_method, sims, T, regime, level, crisis, final_scenario_name = result
                 factors = s_means = None
 
     with scol2:
-        with st.container(border=True):
-            st.markdown("#### Classification")
+        if sim_method == 'Monte Carlo':
+           container = st.container(border=True, height=527)
+        else:
+            container = st.container(border=True, height=359)
+
+        with container:
+            st.markdown("#### Classification & Factor Shocks")
             factors = render_classification(portfolios, name)
 
             if factors is not None:
@@ -703,68 +751,74 @@ def simulation_config():
                 f = FactorStress(df)
                 
                 #Run factor functions
-                process, process_error = f.process_factors(factors)
+                _, process_error = f.process_factors(factors)
                 classify_df, classify_error = f.classify_factors()
 
                 if process_error:
-                    st.error(f"Error processing factors: {process_error}")
+                    st.error(f"Error processing factors: {process_error}", icon="❌")
                 elif classify_error:
-                    st.error(f"Error classifying factors: {classify_error}")
+                    st.error(f"Error classifying factors: {classify_error}", icon="❌")
                 else:
                     #Display classification
                     st.dataframe(classify_df, use_container_width=True)
                     shocks = render_shocks(portfolios, name, factors)
                     if shocks:
-                        s_means, s_means_error = f.stress_means(shocks)
+                        s_means, s_means_error, s_means_warning = f.stress_means(shocks)
                         if s_means_error:
-                            st.error(f"Error in stressing means: {s_means_error}")
+                            st.error(f"Error in stressing means: {s_means_error}", icon="❌")
+                        elif s_means_warning:
+                            st.warning(f"Warning: {s_means_warning}", icon="⚠️")
 
     #Confirmation Button
-    confirm = st.button("Confirm Scenario", use_container_width=True)
-    if confirm:
-        with st.spinner("Running simulation..."):
-            try:
-                df = portfolios[name]['configs']['df']
-                weights = portfolios[name]['configs']['weights']
-                
-                if sim_method == 'Monte Carlo':
-                    results, error = monte_carlo(T, sims, weights, df, regime, level, s_means)
-                elif sim_method == 'Historical Replay':
-                    results, error = historical(df, crisis)
-                
-                if error:
-                    st.error(f"Simulation error: {error}")
-                else:
-                    #Store in session state
+    if final_scenario_name in scenarios or st.session_state.current_scenario in scenarios:
+        st.button("Confirm Scenario", use_container_width=True, disabled=True)
+    else:
+        confirm = st.button("Confirm Scenario", use_container_width=True)
+        if confirm:
+            with st.spinner("Running simulation..."):
+                try:
+                    df = portfolios[name]['configs']['df']
+                    weights = portfolios[name]['configs']['weights']
+                    
                     if sim_method == 'Monte Carlo':
+                        results, error = monte_carlo(T, sims, weights, df, regime, level, s_means)
+                    elif sim_method == 'Historical Replay':
+                        results, error = historical(df, crisis)
+                    
+                    if error:
+                        st.error(f"Simulation error: {error}")
+                    else:
+                        #Store in session state
+                        if sim_method == 'Monte Carlo':
+                                scenarios[final_scenario_name] = {
+                                    'sim_method': sim_method,
+                                    '# sims': sims,
+                                    '# days': T,
+                                    'regime': regime,
+                                    'level': level,
+                                    'factors': factors,
+                                    'factor_shocks': shocks,
+                                    'stressed_means': {'means': s_means,
+                                                    'warning': s_means_warning},
+                                    'results': results,
+                                    }
+                                
+                        elif sim_method == 'Historical Replay':
                             scenarios[final_scenario_name] = {
                                 'sim_method': sim_method,
-                                '# sims': sims,
-                                '# days': T,
-                                'regime': regime,
-                                'level': level,
-                                'factors': factors,
-                                'factor_shocks': shocks,
-                                'stressed_means': s_means,
-                                'results': results
+                                'crisis': crisis,
+                                'results': results,
                                 }
                             
-                    elif sim_method == 'Historical Replay':
-                        scenarios[final_scenario_name] = {
-                            'sim_method': sim_method,
-                            'crisis': crisis,
-                            'results': results
-                            }
-                        
-                    portfolios[name]['scenario_ctr'] += 1
-                    portfolios[name]['sim_complete'] = True
-                    st.session_state.current_scenario = final_scenario_name
-                    st.success("Scenario successfully created!", icon="✅")
-                    time.sleep(1)
-                    st.rerun()
+                        portfolios[name]['scenario_ctr'] += 1
+                        portfolios[name]['sim_complete'] = True
+                        st.session_state.current_scenario = final_scenario_name
+                        st.success("Scenario successfully created!", icon="✅")
+                        time.sleep(1)
+                        st.rerun()
 
-            except Exception as e:
-                st.error(f"Simulation failed: {str(e)}")
+                except Exception as e:
+                    st.error(f"Simulation failed: {str(e)}")
 
 
     #Create another scenario

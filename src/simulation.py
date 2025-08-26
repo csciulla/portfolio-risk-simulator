@@ -327,6 +327,7 @@ class FactorStress:
                     shocks[factor] = 0
 
             #Handle 'FF3' and 'FF5' shocks
+            warning = None
             FF3_check = FF5_check = False
             if 'FF3' in shocks.keys():
                 FF3_check = True
@@ -371,7 +372,7 @@ class FactorStress:
                         'CMA': FF5_value
                         })
             if FF3_check and FF5_check:
-                print("Warning: Both 'FF3' and 'FF5' have been inserted in the shocks dictionary. FF5 factors have overwritten overlapping FF3 factors.")
+                warning = "Both 'FF3' and 'FF5' have been selected. FF5 factors will overwrite overlapping FF3 factors."
                 print(shocks)
 
             #Compute stressed mean returns
@@ -388,8 +389,8 @@ class FactorStress:
             stressed_means['SPY'] = 0.0
             stressed_means_list = list(map(float, list(stressed_means.values())))
 
-            return stressed_means_list, None   
+            return stressed_means_list, None, warning
 
         except Exception as e:
-            return None, str(e)
+            return None, str(e), None
         

@@ -182,7 +182,9 @@ class Portfolio:
       fig = go.Figure(data=[go.Pie(labels=tickers, values=weights, hole=0)])
 
       fig.update_layout(
-        margin=dict(t=40, b=0, l=0, r=0)
+        height=395,
+        showlegend=False,
+        margin=dict(t=0, b=0, l=0, r=0)
       )
       fig.update_traces(
         textinfo='percent+label',
