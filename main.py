@@ -1,5 +1,6 @@
 from src.portfolio import Portfolio
 from src.simulation import monte_carlo, historical, FactorStress
+from src.metrics import calculate_metrics, MonteCarloAnalyzer
 import streamlit as st
 import streamlit_shadcn_ui as ui
 import pandas as pd
@@ -655,7 +656,7 @@ def render_shocks(portfolios:dict, name:str, factors:list):
         
         #No shocks desired
         else:   
-            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-80px')
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-60px')
 
             return {}
             
@@ -712,7 +713,7 @@ def render_shocks(portfolios:dict, name:str, factors:list):
         else:
             st.checkbox("**Would you like to induce factor-stress into the simulation?**", value=False, disabled=True)
             st.caption("_FF3/FF5 apply uniform stress. Select individual factors for asymmetric shocks._")
-            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-80px')
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-60px')
 
             return {}
 
@@ -725,6 +726,7 @@ def simulation_config():
     portfolios = st.session_state.portfolios
     name = st.session_state.current_portfolio
     scenarios = portfolios[name]['scenarios']
+    scenario_name = st.session_state.current_scenario
 
     scol1, scol2 = st.columns(2)
 
@@ -734,13 +736,13 @@ def simulation_config():
             result = render_scenario(portfolios, name)
             if result:
                 sim_method, sims, T, regime, level, crisis, final_scenario_name = result
-                factors = s_means = None
+                factors = s_means = s_means_warning = None
 
     with scol2:
-        if sim_method == 'Monte Carlo':
-           container = st.container(border=True, height=527)
-        else:
+        if sim_method == 'Historical Replay' and scenarios.get(scenario_name, None) is None:
             container = st.container(border=True, height=359)
+        else:
+            container = st.container(border=True, height=527)
 
         with container:
             st.markdown("#### Classification & Factor Shocks")
@@ -799,7 +801,7 @@ def simulation_config():
                                     'factors': factors,
                                     'factor_shocks': shocks,
                                     'stressed_means': {'means': s_means,
-                                                    'warning': s_means_warning},
+                                                       'warning': s_means_warning},
                                     'results': results,
                                     }
                                 
@@ -820,7 +822,6 @@ def simulation_config():
                 except Exception as e:
                     st.error(f"Simulation failed: {str(e)}")
 
-
     #Create another scenario
     scenario_create = st.button("Create Another Scenario?", use_container_width=True)
     if scenario_create:
@@ -838,6 +839,33 @@ def simulation_config():
     if selected_scenario != "Select a scenario..." and selected_scenario != st.session_state.current_scenario:
         st.session_state.current_scenario = selected_scenario
         st.rerun()
+
+
+#------Results & Metrics Functions------
+
+def render_montecarlo_visuals(portfolios:dict, name:str):
+    """
+    Renders Monte Carlo scenario visuals and metrics.
+    Displays info box if no Monte Carlo scenario exists.
+    """
+    scenarios = portfolios[name]['scenarios']
+    monte_carlo_scenarios = {label: configs for label, configs in scenarios.items() if configs['sim_method'] == 'Monte Carlo'}
+    weights = portfolios[name]['configs']['weights']
+
+
+    if monte_carlo_scenarios is not {}:
+        S = MonteCarloAnalyzer()
+        for scenario_name in monte_carlo_scenarios:
+            scenario_data = monte_carlo_scenarios[scenario_name]
+            S.add_simulation(scenario_name, scenario_data['results'])
+            S.all_metrics(weights)
+            S.get_confidence_intervals(0.95)
+
+        mc_select = st.selectbox("**Select Monte Carlo Scenario to View Metrics for:**", options=list(monte_carlo_scenarios.keys()))
+
+
+def metrics_configuration():
+    pass
 
 
 def main():

@@ -85,7 +85,7 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
   except Exception as e:
     return None, str(e)
   
-class SimulationAnalyzer:
+class MonteCarloAnalyzer:
     def __init__(self):
         self.batches = {}
         self.all_metrics_df = {}
@@ -141,6 +141,37 @@ class SimulationAnalyzer:
         except Exception as e:
             return None, str(e)
         
+        
+    def get_confidence_intervals(self, confidence_level:float=0.95):
+        """
+        Calculate confidence intervals for each metric across all simulations.
+
+        Parameters:
+        - confidence_level: The desired confidence level (default is 0.95 for 95% CI)
+
+        Returns:
+            - ci_dict: Dictionary with labels as keys and DataFrames of confidence intervals as values.
+        """
+        try:
+            ci_dict = {}
+            alpha = 1 - confidence_level
+            lower_bound = alpha / 2
+            upper_bound = 1 - (alpha / 2)
+
+            for label, metrics_df in self.all_metrics_df.items():
+                ci_data = {}
+                for metric in metrics_df.columns:
+                    ci_lower = metrics_df[metric].quantile(lower_bound)
+                    ci_upper = metrics_df[metric].quantile(upper_bound)
+                    ci_data[metric] = (ci_lower, ci_upper)
+                ci_dict[label] = pd.DataFrame(ci_data, index=['Lower CI', 'Upper CI']).T
+
+            return ci_dict, None
+        
+        except Exception as e:
+            return None, str(e)
+        
+
     def visualize_metrics(self):
 
         try:
