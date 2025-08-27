@@ -3,6 +3,7 @@ import numpy as np
 import yfinance as yf
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.neighbors import KernelDensity
 
 def calculate_metrics(weights:list, df:pd.DataFrame):
   """
@@ -79,45 +80,54 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
       PCRdict[ticker] = (f"{PCR*100:.2f}%")
     PCRframe = pd.DataFrame(data=PCRdict, index=["PCR"])
 
-    metrics = pd.DataFrame(data=[[port_vol, port_returns_annualized, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatilty", "Expected Return", "Sharpe","95% VaR", "95% CVaR", "Max DD", "Beta"], index=["Portfolio"])
-    return (metrics, PCRframe), None
+    metrics = pd.DataFrame(data=[[port_vol, port_returns_annualized, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatilty", "Expected Return", "Sharpe","95% VaR", "95% CVaR", "Max Drawdown", "Beta"], index=["Portfolio"])
+    return (metrics, PCRframe, cum_returns), None
 
   except Exception as e:
     return None, str(e)
   
-class MonteCarloAnalyzer:
+  
+class SimulationAnalyzer:
     def __init__(self):
-        self.batches = {}
-        self.all_metrics_df = {}
-        self.all_PCR_df = {}
+        self.mc_batches = {}
+        self.hist_batches = {}
+        self.all_mc_metrics = {}
+        self.all_mc_PCR = {}
+        self.all_mc_cum_returns = {}
 
-    def add_simulation(self, label:str, sims_returns:dict[str, np.array]):
+    def add_simulation(self, label:str, type:str, sims_returns:dict[str, np.array] | pd.DataFrame):
         """
         Add a new simulation batch under a user-defined label.
 
         Parameters:
         - label: Name of the simulation batch
-        - sims_returns: The returns of the simulation derived from the 'monte_carlo' function 
+        - type: Type of simulation -- 'Monte Carlo' or 'Historical Replay'
+        - sims_returns: The returns of the simulation derived from the 'monte_carlo' for 'historical' function
         """
         try:
-            if label in self.batches.keys():
+            if label in self.mc_batches.keys() or label in self.hist_batches.keys():
                 raise ValueError("Label already taken.")
 
-            self.batches[label] = sims_returns
+            if type == 'Monte Carlo':
+              self.mc_batches[label] = sims_returns
+            elif type == 'Historical Replay':
+               self.hist_batches[label] = sims_returns
+            else:
+               raise ValueError("Insert valid type. Either 'monte_carlo' or 'historical'.")
+            
+            return True, None
         
         except Exception as e:
             return None, str(e)
 
+
     def all_metrics(self, weights:list[float]):
         """
         Computes portfolio metrics and PCR values for each simulation path.
-
-        Returns:
-            - all_metrics_df: DataFrame where rows = simulations, cols = metrics.
-            - all_PCR_df: DataFrame where rows = simulations, cols = tickers.
+        Only for monte carlo scenarios.
         """
         try:
-            for label, sims_returns in self.batches.items():
+            for label, sims_returns in self.mc_batches.items():
                 
                 tickers = list(sims_returns.keys())
                 num_sims = len(sims_returns[tickers[0]][0])
@@ -125,19 +135,73 @@ class MonteCarloAnalyzer:
                 all_metrics = []
                 sims_index = []
                 all_PCR = []
+                all_cum_returns = []
                 for i in range(num_sims):
                     sims_index.append(f'Simulation {i+1}')
                     sim_mth_df = pd.DataFrame({ticker: sims_returns[ticker][:, i] for ticker in tickers})
 
-                    metrics_df, PCR_df = calculate_metrics(weights, sim_mth_df)
+                    results, error = calculate_metrics(weights, sim_mth_df)
+                    if error:
+                       raise ValueError(f"Error in path {i} metrics calculation: {error}")
+                    
+                    metrics_df = results[0]
+                    PCR_df = results[1]
+                    cum_returns = results[-1]
                     all_metrics.append(metrics_df.loc['Portfolio'])
                     all_PCR.append(PCR_df.loc['PCR'])
+                    all_cum_returns.append(cum_returns)
 
-                self.all_metrics_df[label] = pd.DataFrame(data=all_metrics, index=sims_index)
-                self.all_PCR_df[label] = pd.DataFrame(data=all_PCR, index=sims_index)
+                self.all_mc_metrics[label] = pd.DataFrame(data=all_metrics, index=sims_index)
+                self.all_mc_PCR[label] = pd.DataFrame(data=all_PCR, index=sims_index)
+                self.all_mc_cum_returns[label] = pd.DataFrame(data=all_cum_returns, index=sims_index)
 
-            return (self.all_metrics_df, self.all_PCR_df), None
+            return (self.all_mc_metrics, self.all_mc_PCR, self.all_mc_cum_returns), None
         
+        except Exception as e:
+            return None, str(e)
+        
+    def get_display_path(self, label:str, type_path:str, use_metrics=None):
+        """ 
+        Returns the metrics of the desired path from the all monte carlo metrics dataframe.
+
+        Parameters:
+        - type_path: Type of path to return -- 'Best', 'Worst', or 'Representative'
+        - use_metrics: list of column names from self.all_mc_metrics[0] to fit KDE on
+        """
+        try:    
+            if type_path != 'Representative':
+                sharpes = self.all_mc_metrics[label]['Sharpe'].values
+
+                if type_path == 'Best':
+                    idx = np.argmax(sharpes)
+                
+                elif type_path == 'Worst':
+                    idx = np.argmin(sharpes)                  
+                
+            elif type_path == 'Representative':
+                if use_metrics is None:
+                    use_metrics = ['Annual Volatilty', 'Sharpe', '95% VaR', 'Max Drawdown']
+
+                metrics_df = self.all_mc_metrics[label]
+
+                #Build joint dataset
+                X = metrics_df.loc[:, use_metrics].values
+                kde = KernelDensity(kernel='gaussian', bandwidth=0.1).fit(X)
+
+                #Score each path
+                log_probs = kde.score_samples(X)
+                idx = np.argmax(log_probs)
+            
+            else:
+                raise ValueError("Invaild type_path input. Must be either 'Best', 'Worst', or 'Representative'.")
+            
+            #Extract results
+            metrics = self.all_mc_metrics[label].iloc[idx].copy()
+            PCR = self.all_mc_PCR[label].iloc[idx].copy()
+            cum_returns = self.all_mc_cum_returns[label].iloc[idx].copy()
+
+            return (metrics, PCR, cum_returns), None
+            
         except Exception as e:
             return None, str(e)
         
@@ -158,7 +222,7 @@ class MonteCarloAnalyzer:
             lower_bound = alpha / 2
             upper_bound = 1 - (alpha / 2)
 
-            for label, metrics_df in self.all_metrics_df.items():
+            for label, metrics_df in self.all_mc_metrics.items():
                 ci_data = {}
                 for metric in metrics_df.columns:
                     ci_lower = metrics_df[metric].quantile(lower_bound)

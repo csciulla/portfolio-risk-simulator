@@ -1,6 +1,6 @@
 from src.portfolio import Portfolio
 from src.simulation import monte_carlo, historical, FactorStress
-from src.metrics import calculate_metrics, MonteCarloAnalyzer
+from src.metrics import calculate_metrics, SimulationAnalyzer
 import streamlit as st
 import streamlit_shadcn_ui as ui
 import pandas as pd
@@ -843,29 +843,95 @@ def simulation_config():
 
 #------Results & Metrics Functions------
 
-def render_montecarlo_visuals(portfolios:dict, name:str):
+def render_metric_cards(portfolios:dict, name:str):
     """
-    Renders Monte Carlo scenario visuals and metrics.
-    Displays info box if no Monte Carlo scenario exists.
+    Renders metric cards for a select scenario with comparision to baseline metrics.
     """
     scenarios = portfolios[name]['scenarios']
-    monte_carlo_scenarios = {label: configs for label, configs in scenarios.items() if configs['sim_method'] == 'Monte Carlo'}
+    scenario_name = st.session_state.current_scenario
     weights = portfolios[name]['configs']['weights']
+    baseline_df = portfolios[name]['configs']['df']
+    scenario_labels = []
+
+    #Get metrics
+    baseline_result, baseline_error = calculate_metrics(weights, baseline_df)
+    if baseline_error:
+        st.error(f"Error calculating baseline metrics: {baseline_error}", icon='❌')
+        return
+    
+    baseline_metrics = baseline_result[0]
+
+    S = SimulationAnalyzer()
+    for label, data in scenarios.items():
+        scenario_labels.append(label)
+        sim_returns = data['results']
+        sim_type = data['sim_method']
+        _, add_error = S.add_simulation(label, sim_type, sim_returns)
+        if add_error:
+            st.error(f"Error adding simulation {label}: {add_error}", icon='❌')
+            return
+
+    _, concat_error = S.all_metrics(weights)
+    if concat_error:
+        st.error(f"Error calculating all scenario metrics: {concat_error}")
+        return
+
+    #Select scenario
+    col1, col2 = st.columns([0.4, 0.6])
+    with col1:
+        select_scenario = st.selectbox("**Select Scenario to View:**", scenario_labels, index=scenario_labels.index(scenario_name))
+    with col2:
+        path_type = st.pills("**Select Path to View:**", ['Representative','Best', 'Worst'], default='Representative')
+
+    #Get desired path type data
+    path_results, get_path_error = S.get_display_path(select_scenario, path_type)
+    if get_path_error:
+        st.error(f"Error getting display path: {get_path_error}", icon='❌')
+        return 
+        
+    metrics = path_results[0]
+
+    #Display metric cards
+    default_metrics = ['Annual Volatilty', 'Sharpe', '95% VaR', 'Max Drawdown']
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+
+    with mcol1: # Annual Volatility
+        metric_val = float(metrics[default_metrics[0]])
+        baseline_val = float(baseline_metrics[default_metrics[0]])
+        vol_delta = metric_val - baseline_val
+        st.metric(label=default_metrics[0], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", delta_color='inverse', border=True)
+        
+    with mcol2: #Sharpe Ratio
+        metric_val = float(metrics[default_metrics[1]])
+        baseline_val = float(baseline_metrics[default_metrics[1]])
+        sharpe_delta = metric_val - baseline_val
+        st.metric(default_metrics[1], f"{metric_val:.4f}", f"{sharpe_delta:.4f}", border=True)
+        
+    with mcol3: #95% VaR
+        metric_val = float(metrics[default_metrics[2]])
+        baseline_val = float(baseline_metrics[default_metrics[2]])
+        VaR_delta = metric_val - baseline_val
+        st.metric(default_metrics[2], f"{metric_val:.4f}", f"{VaR_delta:.4f}", border=True)
+        
+    with mcol4: #Max Drawdown
+        metric_val = float(metrics[default_metrics[3]])
+        baseline_val = float(baseline_metrics[default_metrics[3]])
+        mdd_delta = metric_val - baseline_val
+        st.metric(default_metrics[3], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
 
 
-    if monte_carlo_scenarios is not {}:
-        S = MonteCarloAnalyzer()
-        for scenario_name in monte_carlo_scenarios:
-            scenario_data = monte_carlo_scenarios[scenario_name]
-            S.add_simulation(scenario_name, scenario_data['results'])
-            S.all_metrics(weights)
-            S.get_confidence_intervals(0.95)
 
-        mc_select = st.selectbox("**Select Monte Carlo Scenario to View Metrics for:**", options=list(monte_carlo_scenarios.keys()))
+def metrics():
+    """
+    UI for Metrics & Visualization page.
+    """
+    portfolios = st.session_state.portfolios
+    name = st.session_state.current_portfolio
+    scenarios = portfolios[name]['scenarios']
+    scenario_name = st.session_state.current_scenario
+    st.header("Metrics & Visualization", divider=True)
 
-
-def metrics_configuration():
-    pass
+    render_metric_cards(portfolios, name)
 
 
 def main():
@@ -882,7 +948,7 @@ def main():
     elif current_page.startswith('sim_'):
         simulation_config()
     elif current_page.startswith('metrics_'):
-        pass
+        metrics()
 
 if __name__ == '__main__':
     main()
