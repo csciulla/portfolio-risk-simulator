@@ -1,6 +1,6 @@
 from src.portfolio import Portfolio
 from src.simulation import monte_carlo, historical, FactorStress
-from src.metrics import calculate_metrics, SimulationAnalyzer
+from src.metrics import calculate_metrics, plot_cumulative_returns, SimulationAnalyzer
 import streamlit as st
 import streamlit_shadcn_ui as ui
 import pandas as pd
@@ -20,6 +20,10 @@ if 'current_scenario' not in st.session_state:
     st.session_state.current_scenario = None
 if 'temp_sim_method' not in st.session_state:
     st.session_state.current_sim_method = None
+if 'sim_analyzer' not in st.session_state:
+    st.session_state.sim_analyzer = None
+if 'current_path_type' not in st.session_state:
+    st.session_state.current_path_type = None
 
 def home():
     """
@@ -52,6 +56,7 @@ def home():
                 'config_complete': False,
                 'configs': {
                     'tickers': None,
+                    'portfolio_value': None,
                     'timeframe': None,
                     'weight_allocation': {'method': None,
                                           'lbound': None,
@@ -167,20 +172,28 @@ def render_info_box(message:str, icon:str=None, height:int = 300, margin_top:str
 
 #------Portfolio Configuration Functions------
 
-def render_ticker_input(portfolios:dict, name:str):
+def render_basic_config(portfolios:dict, name:str):
     """
-    Renders portfolio ticker input.
+    Renders portfolio ticker and value input components.
     Displays locked state with previously selected values after portfolio download.
 
     Parameters:
     - portfolios: Dictionary containing all characteristics for each portfolio that the user has defined
     - name: String of the current portfolio name
     """
-    if portfolios[name]['configs']['tickers'] is None:
+    if portfolios[name]['configs']['tickers'] is None and portfolios[name]['configs']['portfolio_value'] is None:
         tickers_input = st.text_input("**Enter Portfolio Tickers:**", 
                                       placeholder='AAPL, MSFT, GOOG, TSLA', 
                                       help="Enter stock symbols seperated by commas")
         tickers = [ticker.strip().upper() for ticker in tickers_input.split(",")]
+
+        portfolio_value = st.number_input("**Enter Portfolio Value ($):**",
+                                          value=100000, 
+                                          min_value=1000,
+                                          max_value=10000000, 
+                                          step=5000,
+                                          format='%d',
+                                          help='Enter your inital investment amount in USD')
     
     #Display locked state if tickers already chosen 
     else:
@@ -189,7 +202,12 @@ def render_ticker_input(portfolios:dict, name:str):
                                 disabled=True,
                                 help="Previously configured tickers")
         
-    return tickers
+        portfolio_value = st.number_input("**Enter Portfolio Value ($):**",
+                                          value=portfolios[name]['configs']['portfolio_value'],
+                                          disabled=True,
+                                          help="Previously configured portfolio value")
+
+    return tickers, portfolio_value
 
 
 def render_timeframe_input(portfolios:dict, name:str):
@@ -345,11 +363,11 @@ def render_pie(portfolios:dict, name:str):
     Renders pie chart.
     Returns an info box before portfolio download.
     """
-    with st.container(border=True, height=480):
+    with st.container(border=True, height=560):
         st.markdown("#### Weight Allocation")
         if portfolios[name]['configs']['pie'] is None:
             render_info_box("Portfolio pie chart will appear here once data is downloaded.",
-                            icon='📊', height=360, margin_top="0px")
+                            icon='📊', height=360, margin_top="30px")
         else:
             st.plotly_chart(portfolios[name]['configs']['pie'], use_container_width=True)
 
@@ -363,7 +381,7 @@ def render_line(portfolios:dict, name:str):
         with st.container(border=True, height=250):
             st.markdown("#### Normalized Portfolio Performance")
             render_info_box("Portfolio line chart will appear here once data is downloaded.",
-                        icon='📈', height=120, margin_top="18px")
+                        icon='📈', height=120, margin_top="0px")
     else:
         with st.container(border=True):
             st.markdown("#### Normalized Portfolio Performance")
@@ -382,10 +400,10 @@ def portfolio_config():
 
     #Input Parameters
     with pcol1:
-        with st.container(border=True, height=480):
+        with st.container(border=True, height=560):
             st.markdown("#### Input Parameters")
 
-            tickers = render_ticker_input(portfolios, name)
+            tickers, portfolio_value = render_basic_config(portfolios, name)
             period, start_date, end_date = render_timeframe_input(portfolios, name)
             type_weight, lbound, ubound, custom_weights_list = render_weight_input(portfolios, name, tickers)
 
@@ -395,7 +413,9 @@ def portfolio_config():
                     try:
                         #Create portfolio object
                         port = Portfolio(tickers, lbound, ubound)
-                        df, df_error = port.get_data(period=period, start_date=start_date, end_date=end_date)
+                        df, df_error, df_warning = port.get_data(period=period, start_date=start_date, end_date=end_date)
+                        if df_warning:
+                            st.warning(f"Warning: {df_warning}", icon = "⚠️")
 
                         # Get weights
                         if type_weight == 'custom' and custom_weights_list:
@@ -430,6 +450,7 @@ def portfolio_config():
                             name = st.session_state.current_portfolio
                             portfolios[name]['config_complete'] = True
                             portfolios[name]['configs']['tickers'] = tickers
+                            portfolios[name]['configs']['portfolio_value'] = portfolio_value
 
                             if period and start_date is None and end_date is None:
                                 portfolios[name]['configs']['timeframe'] = period
@@ -862,34 +883,46 @@ def render_metric_cards(portfolios:dict, name:str):
     baseline_metrics = baseline_result[0]
 
     S = SimulationAnalyzer()
+    st.session_state.sim_analyzer = S
     for label, data in scenarios.items():
         scenario_labels.append(label)
         sim_returns = data['results']
         sim_type = data['sim_method']
-        _, add_error = S.add_simulation(label, sim_type, sim_returns)
+        hist_batches, add_error = S.add_simulation(label, sim_type, sim_returns)
         if add_error:
             st.error(f"Error adding simulation {label}: {add_error}", icon='❌')
             return
+    
+    if sim_type == 'Monte Carlo': #Monte Carlo case
+        _, concat_error = S.all_metrics(weights)
+        if concat_error:
+            st.error(f"Error calculating all scenario metrics: {concat_error}", icon='❌')
+            return
 
-    _, concat_error = S.all_metrics(weights)
-    if concat_error:
-        st.error(f"Error calculating all scenario metrics: {concat_error}")
-        return
+        #Select scenario
+        scol1, scol2 = st.columns(2)
+        with scol1:
+            select_scenario = st.selectbox("**Select Scenario to View:**", scenario_labels, index=scenario_labels.index(scenario_name))
+            st.session_state.current_scenario = select_scenario
+        with scol2:
+            path_type = st.selectbox("**Select Path to View:**", ['Representative','Best', 'Worst'], index=0)
+            st.session_state.current_path_type = path_type
+            
+        #Get desired path type data
+        results, get_path_error = S.get_display_path(select_scenario, path_type)
+        if get_path_error:
+            st.error(f"Error getting display path: {get_path_error}", icon='❌')
+            return 
+            
+        metrics = results[0]
 
-    #Select scenario
-    col1, col2 = st.columns([0.4, 0.6])
-    with col1:
+    else: #Historical Replay case
         select_scenario = st.selectbox("**Select Scenario to View:**", scenario_labels, index=scenario_labels.index(scenario_name))
-    with col2:
-        path_type = st.pills("**Select Path to View:**", ['Representative','Best', 'Worst'], default='Representative')
+        st.session_state.current_scenario = select_scenario
 
-    #Get desired path type data
-    path_results, get_path_error = S.get_display_path(select_scenario, path_type)
-    if get_path_error:
-        st.error(f"Error getting display path: {get_path_error}", icon='❌')
-        return 
-        
-    metrics = path_results[0]
+        hist_data = hist_batches[scenario_name]
+        results = calculate_metrics(weights, hist_data)
+        metrics = results[0][0]
 
     #Display metric cards
     default_metrics = ['Annual Volatilty', 'Sharpe', '95% VaR', 'Max Drawdown']
@@ -920,6 +953,75 @@ def render_metric_cards(portfolios:dict, name:str):
         st.metric(default_metrics[3], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
 
 
+def render_cumulative_returns(portfolios:dict, name:str):
+    """
+    Renders final portfolio value and cumulative returns line chart.
+    """
+    intial_value = portfolios[name]['configs']['portfolio_value']
+    scenarios = portfolios[name]['scenarios']
+    scenario_name = st.session_state.current_scenario
+    current_path = st.session_state.current_path_type
+    sim_analyzer = st.session_state.sim_analyzer
+
+    has_multiple_scenarios = len(scenarios) > 1
+
+    if scenarios[scenario_name]['sim_method'] == 'Monte Carlo': #Monte Carlo scenario
+        if has_multiple_scenarios:
+            view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True)
+        else:
+            view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True, index=0, disabled=True)
+
+    else: #Historical replay scenario
+        view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True, index=1, disabled=True)
+
+    if view_mode == 'Detailed View': #Shows all three path cumulative returns for selected scenario
+        repr_results, repr_error = sim_analyzer.get_display_path(scenario_name, 'Representative')
+        best_results, best_error = sim_analyzer.get_display_path(scenario_name, 'Best')
+        worst_results, worst_error = sim_analyzer.get_display_path(scenario_name, 'Worst')
+        if repr_error or best_error or worst_error:
+            st.error(f"Error getting display paths: {repr_error or best_error or worst_error}", icon='❌')
+            return
+        
+        #Cumulative returns
+        repr_cum_returns, best_cum_returns, worst_cum_returns = repr_results[2], best_results[2], worst_results[2]
+        cum_returns_df = pd.concat([repr_cum_returns, best_cum_returns, worst_cum_returns], axis=1)
+        cum_returns_df.columns = ['Representative', 'Best', 'Worst']
+
+        #Plot
+        plot_cum, plot_cum_error = plot_cumulative_returns(intial_value, view_mode, cum_returns_df, current_scenario=scenario_name, current_path=current_path)
+        if plot_cum_error:
+            st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
+            return
+        st.plotly_chart(plot_cum, use_container_width=True)
+    
+    elif view_mode == 'Compare Scenarios': #Compares representative paths of all scenarios
+        all_cum_returns = {}
+        for label in scenarios.keys():
+            if scenarios[label]['sim_method'] == 'Monte Carlo':
+                cum_results, cum_error = sim_analyzer.get_display_path(label, 'Representative')
+                if cum_error:
+                    st.error(f"Error getting display path: {cum_error}", icon='❌')
+                    return
+                
+            elif scenarios[label]['sim_method'] == 'Historical Replay':
+                hist_data = sim_analyzer.hist_batches[label]
+                cum_results, cum_error = calculate_metrics(portfolios[name]['configs']['weights'], hist_data)
+                if cum_error:
+                    st.error(f"Error calculating metrics for historical replay: {cum_error}", icon='❌')
+                    return
+
+            all_cum_returns[label] = cum_results[2]
+        
+        all_repr_df = pd.DataFrame(all_cum_returns)
+        
+        #Plot
+        plot_cum, plot_cum_error = plot_cumulative_returns(intial_value, view_mode, all_repr_df, current_scenario=scenario_name)
+        if plot_cum_error:
+            st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
+            return
+        st.plotly_chart(plot_cum, use_container_width=True)
+
+
 
 def metrics():
     """
@@ -932,6 +1034,14 @@ def metrics():
     st.header("Metrics & Visualization", divider=True)
 
     render_metric_cards(portfolios, name)
+
+    mcol1, mcol2 = st.columns(2)
+    with mcol1:
+        with st.container(border=True):
+            st.markdown("#### Cumulative Portfolio Value")
+            render_cumulative_returns(portfolios, name)
+    with mcol2:
+        pass
 
 
 def main():

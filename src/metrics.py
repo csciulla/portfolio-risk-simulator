@@ -3,7 +3,9 @@ import numpy as np
 import yfinance as yf
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.graph_objects as go
 from sklearn.neighbors import KernelDensity
+
 
 def calculate_metrics(weights:list, df:pd.DataFrame):
   """
@@ -85,7 +87,95 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
 
   except Exception as e:
     return None, str(e)
-  
+
+
+def plot_cumulative_returns(inital_value:int, view:str, cum_df:pd.DataFrame | pd.Series, current_scenario:str, current_path:str=None):
+    """ 
+    Plots cumulative return line chart using Plotly.
+
+    Parameters:
+    - inital_value: Integer of starting portfolio value in USD
+    - view: String of view mode -- 'Detailed View' for scenario paths or 'Compare Scenarios' for scenario comparison
+    - cum_df: Dataframe of cumulative returns of cumulative returns of representative, best, and worst paths (Detailed View) 
+                or Dataframe of representative paths of all scenarios (Compare Scenarios)
+
+    - current_scenario: String of the currently selected scenario
+    - current_path: String of the currently selected path ('Representative', 'Best', 'Worst'); required if view is 'Detailed View'
+    """
+    try:
+        fig = go.Figure()
+        
+        #Detailed View: plots representative, best, and worst paths of the current scenario (Only for Monte Carlo)
+        if view == 'Detailed View' and current_path is not None:
+            path_colors = ['#009933', '#00cc66', '#66ff99']
+            labels = list(cum_df.columns)
+            for i, label in enumerate(labels):
+
+                #Opacity based on if current path or not
+                opacity = 1.0 if label == current_path else 0.3
+                line_width = 3 if label == current_path else 2
+
+                fig.add_trace(go.Scatter(
+                x=cum_df.index,
+                y=cum_df[label]*inital_value,
+                mode='lines',
+                name=f'{current_scenario} - {label}',
+                line=dict(color=path_colors[i], width=line_width),
+                opacity=opacity,
+                hovertemplate=f'{label}: %{{y:.2f}}<extra></extra>'
+                ))
+
+                fig.update_layout(
+                title=f'Detailed View Across Paths',
+                xaxis_title='Number of Days',
+                yaxis_title='Portfolio Value (USD)',
+                hovermode='x unified',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ))
+        
+            return fig, None
+        
+        #Compare Scenarios: plots representative paths of all scenarios for comparison
+        elif view == 'Compare Scenarios' and current_path is None:
+            scenario_colors = ['#009933', '#00cc66', '#66ff99', '#339966', '#66cc99', '#99ffcc']
+            labels = list(cum_df.columns)
+            for i, label in enumerate(labels):
+                line_width = 3 if label == current_scenario else 2
+                opacity = 1.0 if label == current_scenario else 0.5
+
+                fig.add_trace(go.Scatter(
+                    x=cum_df.index,
+                    y=cum_df[label]*inital_value,
+                    mode='lines',
+                    name=label,
+                    line=dict(color=scenario_colors[i % len(scenario_colors)], width=line_width),
+                    opacity=opacity,
+                    hovertemplate=f'{label}: %{{y:.2f}}<extra></extra>'
+                ))
+
+                fig.update_layout(
+                title='Across Scenarios',
+                xaxis_title='Number of Days',
+                yaxis_title='Portfolio Value (USD)',
+                hovermode='x unified',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                ))
+            
+            return fig, None
+
+    except Exception as e:
+        return None, str(e)
+
   
 class SimulationAnalyzer:
     def __init__(self):
@@ -95,27 +185,27 @@ class SimulationAnalyzer:
         self.all_mc_PCR = {}
         self.all_mc_cum_returns = {}
 
-    def add_simulation(self, label:str, type:str, sims_returns:dict[str, np.array] | pd.DataFrame):
+    def add_simulation(self, label:str, type:str, sim_result:dict[str, np.array] | pd.DataFrame):
         """
         Add a new simulation batch under a user-defined label.
 
         Parameters:
         - label: Name of the simulation batch
         - type: Type of simulation -- 'Monte Carlo' or 'Historical Replay'
-        - sims_returns: The returns of the simulation derived from the 'monte_carlo' for 'historical' function
+        - sims_result: The result of the simulation derived from the 'monte_carlo' for 'historical' function
         """
         try:
             if label in self.mc_batches.keys() or label in self.hist_batches.keys():
                 raise ValueError("Label already taken.")
 
             if type == 'Monte Carlo':
-              self.mc_batches[label] = sims_returns
+              self.mc_batches[label] = sim_result
             elif type == 'Historical Replay':
-               self.hist_batches[label] = sims_returns
+               self.hist_batches[label] = sim_result
             else:
                raise ValueError("Insert valid type. Either 'monte_carlo' or 'historical'.")
             
-            return True, None
+            return self.hist_batches, None
         
         except Exception as e:
             return None, str(e)

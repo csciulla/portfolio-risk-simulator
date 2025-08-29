@@ -33,6 +33,8 @@ class Portfolio:
     - end_date: End date of the time series. YYYY-MM-DD format.
     """
     try:
+      warning = None
+
       if period and (start_date or end_date): #checks if both methods of date input are used
         raise ValueError("Provide either 'period' OR both 'start_date' and 'end_date' -- not both.")
 
@@ -51,20 +53,45 @@ class Portfolio:
 
       if self.portfolio_df.empty or self.portfolio_df is None:
         raise ValueError("Downloaded price data is empty or unavailable.")
-      elif len(self.portfolio_df) <= 2:
+      
+      #Check for all NaN data
+      if NaN_count == df_size:
+        raise ValueError("All downloaded data is NaN. Check the ticker symbols and date range.")
+      
+      #Check for completely missing individual tickers
+      completely_missing_tickers = []
+      for ticker in self.portfolio_df.columns:
+        if self.portfolio_df[ticker].isna().all():
+          completely_missing_tickers.append(ticker)
+
+      if completely_missing_tickers:
+        if len(completely_missing_tickers) == len(self.portfolio_df.columns):
+          raise ValueError(f"All tickers failed to download: {', '.join(completely_missing_tickers)}. Check ticker symbols.")
+        else:
+          raise ValueError(f"The following ticker(s) have no data: {', '.join(completely_missing_tickers)}. Check ticker symbols and try again.")
+      
+      # Check for insufficient data length
+      if len(self.portfolio_df) <= 2:
         raise ValueError("Downloaded price data is too short.")
       elif len(self.portfolio_df) < 21: #average trading days in a month
-        print("Warning: Limited price history may lead to unreliable metrics.")
-        
-      if NaN_count >= df_size//10:
-        print("Warning: Some price data does not exist within the downloaded time period. Proceed with caution.")
-      elif NaN_count == df_size:
-        raise ValueError("All downloaded data is NaN. Check the ticker symbols and date range.")
+        warning = "Limited price history may lead to unreliable metrics."
 
-      return self.portfolio_df, None
+      #Check for partially missing tickers 
+      if NaN_count > 0:
+        partially_missing_tickers = []
+        for ticker in self.portfolio_df.columns:
+            ticker_nan_count = self.portfolio_df[ticker].isna().sum()
+            ticker_size = len(self.portfolio_df[ticker])
+            if ticker_nan_count > ticker_size * 0.1:  # More than 10% missing
+                partially_missing_tickers.append(f"{ticker} ({ticker_nan_count}/{ticker_size} missing)")
+        
+        if partially_missing_tickers:
+           warning = f"Warning: Significant missing data detected: {', '.join(partially_missing_tickers)}. Proceed with caution."
+
+      return self.portfolio_df, None, warning
 
     except Exception as e:
-      return None, str(e)
+      return None, str(e), None
     
 
   def get_weights(self, type_weight:str, custom_weights:list[float]=None):
@@ -182,7 +209,7 @@ class Portfolio:
       fig = go.Figure(data=[go.Pie(labels=tickers, values=weights, hole=0)])
 
       fig.update_layout(
-        height=395,
+        height=430,
         showlegend=False,
         margin=dict(t=0, b=0, l=0, r=0)
       )
