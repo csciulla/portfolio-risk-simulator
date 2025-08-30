@@ -23,11 +23,15 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
     #Core calculations
     if df.iloc[0,0] < 1:
       log_returns = df
-      weights = weights + [0.000]
     else:
+      if list(df.columns)[-1] != 'SPY': #For historical case -- not historical replay
+        market_prices = yf.download('SPY', start=df.index[0], end=df.index[-1], progress=False, auto_adjust=False)['Adj Close']
+        df = pd.concat([df, market_prices], axis=1)
+
       log_returns = np.log(df/df.shift()).dropna()
 
     tickers = list(df.columns)
+    weights = weights + [0.0]
     weights = np.array(weights)
     expected_returns = log_returns.mean()*252
     cov_matrix = log_returns.cov()*252
@@ -49,29 +53,12 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
     mdd = drawdown.min() #drawdown values are negative
 
     #Beta
-    if pd.api.types.is_integer_dtype(port_returns_series.index):
-      #Simulated case: align by length
-      market_returns = df['SPY']
-    else:
-      market = yf.download("SPY", period='max', progress=False, auto_adjust=False)["Adj Close"]
-      market_returns = (np.log(market/market.shift()).dropna()).squeeze() #convert to series so that it works properly with port_returns_series
-      
-      #Simulated historical case: align by date
-      start_date = pd.to_datetime(port_returns_series.index[0])
-      end_date = pd.to_datetime(port_returns_series.index[-1])
-      if start_date and end_date not in market_returns.index: #first make sure that market data contains crisis event
-        market = yf.download("SPY", start=start_date, end=end_date, progress=False, auto_adjust=False)["Adj Close"]
-        market_returns = (np.log(market/market.shift()).dropna()).squeeze()
-
-      #align by date for either simulated historical or historical case
-      aligned_index = port_returns_series.index.intersection(market_returns.index)
-      market_returns = market_returns.loc[aligned_index]
-      port_returns_series = port_returns_series.loc[aligned_index]
+    market_returns = log_returns['SPY']
     beta = port_returns_series.cov(market_returns) / market_returns.var()
 
     #Calculate PCR (Percent Contribution to Risk)
     PCRdict = {}
-    if 'SPY' in tickers:
+    if tickers[-1] == 'SPY':
       tickers = tickers[:-1] #Remove 'SPY' 
       weights = weights[:-1]
     for i, ticker in enumerate(tickers):

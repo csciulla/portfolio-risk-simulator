@@ -569,11 +569,11 @@ def render_scenario(portfolios:dict, name:str):
                       index=1, 
                       disabled=True)  
 
-            crisis_options = {'Dot-Com Bubble': 'DOT-COM',
-                              '2008 Global Finanical Crisis': '2008 GFC',
-                              '2011 Euro Zone Crisis': '2011 Euro',
-                              'COVID-19': 'COVID',
-                              '2022 Inflation Crash': '2022 Inf'}
+            crisis_options = {'DOT-COM': 'Dot-Com Bubble',
+                              '2008 GFC':'2008 Global Finanical Crisis',
+                              '2011 Euro':'2011 Euro Zone Crisis',
+                              'COVID':'COVID-19',
+                              '2022 Inf':'2022 Inflation Crash'}
             
             crisis_display = crisis_options.get(scenarios[scenario_name]['crisis'], scenarios[scenario_name]['crisis'])
             st.selectbox("**Select Crisis Event:**", 
@@ -600,7 +600,7 @@ def render_classification(portfolios:dict, name:str):
             classifyq = st.checkbox("**Classify your portfolio?**")
             if not classifyq:
                 render_info_box("Classification allows you to understand how your portfolio is exposed to different risk factors.", 
-                                icon='🏷️', max_width='500px', margin_top='20px')
+                                icon='🏷️', max_width='600px', margin_top='20px')
             else:
                 factors_expanded = ['3-factor Fama-French',
                                     '5-factor Fama-French',
@@ -619,7 +619,7 @@ def render_classification(portfolios:dict, name:str):
 
                 return factors
         else:
-            render_info_box("Classification inputs are only available for Monte Carlo scenarios", icon='🏷️')
+            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", icon='🏷️')
     
     #Display locked state if scenario exists
     elif scenarios[scenario_name]['sim_method'] == 'Monte Carlo' and scenarios[scenario_name]['factors']:
@@ -647,7 +647,12 @@ def render_classification(portfolios:dict, name:str):
         return scenarios[scenario_name]['factors']
     
     else:
-        render_info_box("Classification inputs are only available for Monte Carlo scenarios", icon='🏷️')
+        if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
+            st.checkbox("**Classify your portfolio?**", value=False, disabled=True)
+            render_info_box("Classification allows you to understand how your portfolio is exposed to different risk factors.", 
+                            icon = '🏷️', max_width='600px', margin_top='20px')
+        else:
+            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", icon='🏷️')
 
         return None
 
@@ -760,7 +765,7 @@ def simulation_config():
                 factors = s_means = s_means_warning = None
 
     with scol2:
-        if sim_method == 'Historical Replay' and scenarios.get(scenario_name, None) is None:
+        if sim_method == 'Historical Replay' or scenario_name and scenarios[scenario_name]['sim_method'] == 'Historical Replay':
             container = st.container(border=True, height=359)
         else:
             container = st.container(border=True, height=527)
@@ -769,6 +774,7 @@ def simulation_config():
             st.markdown("#### Classification & Factor Shocks")
             factors = render_classification(portfolios, name)
 
+            shocks = None
             if factors is not None:
                 df = portfolios[name]['configs']['df']
                 f = FactorStress(df)

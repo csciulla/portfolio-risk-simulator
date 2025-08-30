@@ -90,7 +90,7 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
       random_int = np.random.randint(0,sims)
       random_sims_returns = {ticker: sims_returns[ticker][:,random_int] for ticker in tickers}
       random_sims_df = pd.DataFrame(random_sims_returns)
-      return random_sims_df
+      return random_sims_df, None
     elif rand != None:
       raise ValueError("Invaild input for 'rand'. Input the string 'yes' to return a random path, otherwise ignore.")
     else:
@@ -126,7 +126,12 @@ def historical(df:pd.DataFrame, crisis:str):
     if crisis not in crisis_periods.keys():
       raise ValueError("Input a valid crisis event.")
 
+    if list(df.columns)[-1] != 'SPY':
+      market_data = yf.download('SPY', start=df.index[0], end=df.index[-1], progress=False, auto_adjust=False)['Adj Close']
+      df = pd.concat([df, market_data], axis=1)
+
     tickers = list(df.columns)
+
     start_date = pd.to_datetime(crisis_periods[crisis][0])
     end_date = pd.to_datetime(crisis_periods[crisis][1])
 
@@ -139,11 +144,14 @@ def historical(df:pd.DataFrame, crisis:str):
       if dfcrisis[ticker].isna().sum() >= len(dfcrisis[ticker])//3: #checks if any ticker reaches NA threshold
         raise ValueError(f"{ticker} price data does not exist for crisis period.")
 
+    if df.iloc[-1].isna().any():
+      df = df.iloc[:-1]
+      
     last_price = df.iloc[-1]
     crisisReturns = np.log(dfcrisis/dfcrisis.shift()).dropna()
     cumReturns = (1+crisisReturns).cumprod()
     crisisPrices = last_price.mul(cumReturns)
-
+    crisisPrices.index = range(len(crisisPrices))
     return crisisPrices, None
 
   except Exception as e:
