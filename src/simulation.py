@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import statsmodels.api as sm
-import streamlit as st
 from hmmlearn.hmm import GaussianHMM
 
 def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, level:str, factor_stress:list=None, rand:bool=None ):

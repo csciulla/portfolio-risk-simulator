@@ -40,13 +40,22 @@ def home():
     """
     st.title("Portfolio Risk Simulator")
 
+    # Overview section
+    st.markdown("""
+    #### 🎯 What This Tool Does
+    
+    A comprehensive risk assessment platform that helps investors understand how their portfolios perform under different market conditions. 
+    Built with professional-grade methodologies including Monte Carlo simulations, Hidden Markov Models, and Fama-French factor analysis.
+    """)
+
+    #Create Portfolio button
     with st.container(border=True):
+        st.markdown("### 🚀 Create Portfolio")
         port_ct = st.session_state.portfolio_counter
         placeholder_name = f"Portfolio {port_ct}"
         name = st.text_input("**Input a Portfolio Name:**", placeholder=placeholder_name, max_chars=30)
         init_port = st.button("Create Portfolio", use_container_width=True)
         if init_port:
-
             try:
                 portfolios = st.session_state.portfolios
                 if not name:
@@ -68,8 +77,8 @@ def home():
                     'portfolio_value': None,
                     'timeframe': None,
                     'weight_allocation': {'method': None,
-                                          'lbound': None,
-                                          'ubound': None},
+                                            'lbound': None,
+                                            'ubound': None},
                     'df': None,
                     'weights': None,
                     'pie': None,
@@ -79,7 +88,7 @@ def home():
                 'scenario_ctr': 0,
                 'scenarios': {},
                 'sim_analyzer': {'init': False,
-                                 'object': None},
+                                    'object': None},
                 'metrics': None
                 }
 
@@ -88,6 +97,25 @@ def home():
             st.success(f"Portfolio '{name}' created succesfully!", icon="✅")
             time.sleep(1)
             st.rerun()
+    
+    #Example outcomes
+    st.markdown("#### 💡 Example Analysis Scenarios")
+    st.markdown("- Simulate how your portfolio reacts in a extreme market environment with high volatility regimes and stress multipliers")
+    st.markdown("- See how a tech portfolio reacts during a replay of COVID-19 based on data from the past 10 years")
+    st.markdown("- Stress your portfolio by factors such as size and value in medium volatility regime")
+
+    #Connect 
+    st.markdown("---")
+    st.markdown("##### 👤 Connect")
+    st.markdown("""
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="https://linkedin.com/in/christian-sciulla" target="_blank">
+            <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
+        </a>
+        <a href="https://github.com/csciulla" target="_blank">
+            <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def render_sidebar():

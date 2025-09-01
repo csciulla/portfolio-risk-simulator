@@ -3,7 +3,6 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import plotly.express as px
-import streamlit as st
 from sklearn.neighbors import KernelDensity
 from scipy.stats import gaussian_kde
 
@@ -11,7 +10,7 @@ from scipy.stats import gaussian_kde
 def calculate_metrics(weights:list, df:pd.DataFrame):
   """
   Calculates the metrics and the percent contribution of risk for each stock in the portfolio.
-  - Metrics returned: Annual portfolio volatilty, Sharpe Ratio, 95% VaR, 95% CVaR, Max Drawdown, and Beta.
+  - Metrics returned: Annual portfolio volatility, Sharpe Ratio, 95% VaR, 95% CVaR, Max Drawdown, and Beta.
 
   Parameters:
   - weights: List of each assets weight in the portfolio
@@ -69,7 +68,7 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
       PCRdict[ticker] = PCR*100
     PCRframe = pd.DataFrame(data=PCRdict, index=["PCR"])
 
-    metrics = pd.DataFrame(data=[[port_vol, port_returns, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatilty", "Expected Return", "Sharpe Ratio","95% VaR", "95% CVaR", "Max Drawdown", "Beta"], index=["Portfolio"])
+    metrics = pd.DataFrame(data=[[port_vol, port_returns, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatility", "Expected Return", "Sharpe Ratio","95% VaR", "95% CVaR", "Max Drawdown", "Beta"], index=["Portfolio"])
     return (metrics, PCRframe, cum_returns), None
 
   except Exception as e:
@@ -316,7 +315,7 @@ class SimulationAnalyzer:
                 
             elif type_path == 'Representative':
                 if use_metrics is None:
-                    use_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
+                    use_metrics = ['Annual Volatility', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
 
                 metrics_df = self.all_mc_metrics[label]
 

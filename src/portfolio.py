@@ -1,9 +1,7 @@
-import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import matplotlib.colors as mcolors
-import streamlit as st
 from scipy.optimize import minimize
 
 class Portfolio:
@@ -185,7 +183,7 @@ class Portfolio:
       start_color = np.array(mcolors.to_rgb('#4292c6'))
       end_color = np.array(mcolors.to_rgb('#08306b'))
 
-      # Interpolate colors
+      #Interpolate colors
       self.colors = []
       for i in range(n_tickers):
         t = i / max(1, n_tickers - 1)

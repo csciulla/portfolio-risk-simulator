@@ -118,7 +118,7 @@ def render_metric_cards(portfolios:dict, name:str):
             st.error(f"Scenario {scenario_name} not found in combined metrics", icon='❌')
 
     #Display metric cards
-    default_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
+    default_metrics = ['Annual Volatility', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
     mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
 
     with mcol1: # Annual Volatility
@@ -330,7 +330,7 @@ def render_visualize_metrics():
         if len(sim_analyzer.mc_batches.keys()) == 0:
             render_info_box("KDE plots require at least one Monte Carlo simulation to display.", icon='📊')
         else:
-            default_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
+            default_metrics = ['Annual Volatility', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
             metric_choice = st.selectbox("**Choose Metric KDE to Display**:", default_metrics)
 
             plot_metrics, plot_metrics_error = sim_analyzer.visualize_metrics(metric_choice)
