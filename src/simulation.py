@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import statsmodels.api as sm
+import streamlit as st
 from hmmlearn.hmm import GaussianHMM
 
 def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, level:str, factor_stress:list=None, rand:bool=None ):
@@ -203,9 +204,9 @@ class FactorStress:
             self.final_factors = list(set(extended))
 
             #Read and clean factor CSVs
-            FFdf = pd.read_csv('./data/F-F_Research_Data_5_Factors_2x3_daily.csv', skiprows=3, index_col=0).iloc[:-1]
+            FFdf = pd.read_csv('../data/F-F_Research_Data_5_Factors_2x3_daily.csv', skiprows=3, index_col=0).iloc[:-1]
             FFdf.index = pd.to_datetime(FFdf.index)
-            MOMdf = pd.read_csv('./data/F-F_Momentum_Factor_daily.csv', skiprows=13, index_col=0).iloc[:-1]
+            MOMdf = pd.read_csv('../data/F-F_Momentum_Factor_daily.csv', skiprows=13, index_col=0).iloc[:-1]
             MOMdf.index = pd.to_datetime(MOMdf.index)
 
             #Align both factor CSVs and only grab necessary factors

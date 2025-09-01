@@ -3,6 +3,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import plotly.express as px
+import streamlit as st
 from sklearn.neighbors import KernelDensity
 from scipy.stats import gaussian_kde
 

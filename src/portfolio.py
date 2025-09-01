@@ -3,6 +3,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 import matplotlib.colors as mcolors
+import streamlit as st
 from scipy.optimize import minimize
 
 class Portfolio:
@@ -267,10 +268,3 @@ class Portfolio:
 
     except Exception as e:
       return None, str(e)
-    
-
-  
-if __name__ == "__main__":
-    port = Portfolio(["AAPL", "XOM","JPM"], 0.0, 0.5)
-    df = port.get_data(period="5y")
-    print(df.head())
