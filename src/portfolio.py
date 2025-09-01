@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
+import matplotlib.colors as mcolors
 from scipy.optimize import minimize
 
 class Portfolio:
@@ -180,13 +181,16 @@ class Portfolio:
       tickers = list(self.portfolio)
       n_tickers = len(tickers)
 
-      #Add a different shade of blue for each ticker dynamically
-      hex_chars = ['1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
+      start_color = np.array(mcolors.to_rgb('#4292c6'))
+      end_color = np.array(mcolors.to_rgb('#08306b'))
+
+      # Interpolate colors
       self.colors = []
       for i in range(n_tickers):
-        first_char = hex_chars[i % len(hex_chars)]
-        second_char = hex_chars[(i // len(hex_chars)) % len(hex_chars)]
-        self.colors.append(f'#00{first_char}{second_char}66')
+        t = i / max(1, n_tickers - 1)
+        rgb = (1 - t) * start_color + t * end_color
+        hex_color = mcolors.to_hex(rgb)
+        self.colors.append(hex_color)
 
       return self.colors, None
     

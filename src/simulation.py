@@ -36,10 +36,10 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
     regime = regime.strip().capitalize()
     level = level.strip().capitalize()
     factorDict = {"Mild": 1.0,
-                  "Moderate": 1.3,
-                  "Severe": 1.7,
-                  "Tail risk": 2.0,
-                  "Regulatory": 2.5}
+                  "Moderate": 1.15,
+                  "Severe": 1.35,
+                  "Tail risk": 1.6,
+                  "Regulatory": 1.8}
     scaling_factor = factorDict[level]
 
     #Calculate log returns and align with market returns
