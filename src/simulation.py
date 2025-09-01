@@ -19,7 +19,7 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
   - rand: input the boolean 'True' to return a random simulation, otherwise ignore
 
     regime options: 'Low', 'Medium', 'High'
-    level options: 'Mild', 'Moderate', 'Severe', 'Tail Risk', 'Regulatory'
+    level options: '1.0x', '1.15x', '1.25x', '1.35x', '1.5x'  
   """
   try:
     if T <= 2:
@@ -34,12 +34,12 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
     
     #Correspond regime with scaling factor
     regime = regime.strip().capitalize()
-    level = level.strip().capitalize()
-    factorDict = {"Mild": 1.0,
-                  "Moderate": 1.15,
-                  "Severe": 1.35,
-                  "Tail risk": 1.6,
-                  "Regulatory": 1.8}
+    level = level.strip()
+    factorDict = {"1.0x": 1.0,
+                  "1.15x": 1.15,
+                  "1.25x": 1.25,
+                  "1.35x": 1.35,
+                  "1.5x": 1.5}
     scaling_factor = factorDict[level]
 
     #Calculate log returns and align with market returns
@@ -63,7 +63,7 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
     #Initalize HMM
     port_returns = (log_returns @ weights).values.reshape(-1,1) #HMM requires 2D array
     historical_port_vol = np.std(port_returns)
-    model = GaussianHMM(n_components=3, covariance_type="full", n_iter=1000, random_state=42)
+    model = GaussianHMM(n_components=3, covariance_type="diag", n_iter=2000, random_state=42)
     model.fit(port_returns)
 
     #Gather the volatility regimes established by the HMM and correspond them with their respective state
@@ -75,6 +75,7 @@ def monte_carlo(T:int, sims:int, weights:list, df:pd.DataFrame, regime:str, leve
     #Calculate the scale factor needed for the historical data to reach the desired volatility and then apply it to L
     desired_vol = vol_dict[regime]*scaling_factor
     vol_scale_factor = desired_vol / historical_port_vol
+    vol_scale_factor = min(vol_scale_factor, 3.0)
     cov_matrix = log_returns.cov()* (vol_scale_factor**2)
     L = np.linalg.cholesky(cov_matrix)
 

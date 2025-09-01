@@ -1,10 +1,8 @@
 import pandas as pd
 import numpy as np
 import yfinance as yf
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import plotly.express as px
 from sklearn.neighbors import KernelDensity
 from scipy.stats import gaussian_kde
 
@@ -40,7 +38,6 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
     rf = 0.045
     port_returns = weights.T @ expected_returns
     port_returns_series = log_returns @ weights
-    port_returns_annualized = port_returns * 252
 
     #Metrics
     port_vol = np.sqrt(weights.T @ cov_matrix @ weights)
@@ -71,14 +68,14 @@ def calculate_metrics(weights:list, df:pd.DataFrame):
       PCRdict[ticker] = PCR*100
     PCRframe = pd.DataFrame(data=PCRdict, index=["PCR"])
 
-    metrics = pd.DataFrame(data=[[port_vol, port_returns_annualized, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatilty", "Expected Return", "Sharpe","95% VaR", "95% CVaR", "Max Drawdown", "Beta"], index=["Portfolio"])
+    metrics = pd.DataFrame(data=[[port_vol, port_returns, sharpe, VaR_95, CVaR_95, mdd, beta]] ,columns=["Annual Volatilty", "Expected Return", "Sharpe Ratio","95% VaR", "95% CVaR", "Max Drawdown", "Beta"], index=["Portfolio"])
     return (metrics, PCRframe, cum_returns), None
 
   except Exception as e:
     return None, str(e)
 
 
-def plot_cumulative_returns(inital_value:int, view:str, cum_df:pd.DataFrame,  current_scenario:str, current_path:str=None):
+def plot_cumulative_returns(inital_value:int, view:str, cum_df:pd.DataFrame, current_scenario:str, current_path:str=None):
     """ 
     Plots cumulative return line chart using Plotly.
 
@@ -132,7 +129,7 @@ def plot_cumulative_returns(inital_value:int, view:str, cum_df:pd.DataFrame,  cu
         
         #Compare Scenarios: plots representative paths of all scenarios for comparison
         elif view == 'Compare Scenarios' and current_path is None:
-            scenario_colors = ['#4292c6', '#2171b5', '#1d5fa2', '#1563ad', '#08519c', '#0b4886', '#08306b']
+            scenario_colors = px.colors.qualitative.Plotly
             labels = list(cum_df.columns)
             for i, label in enumerate(labels):
                 line_width = 3 if label == current_scenario else 2
@@ -143,7 +140,7 @@ def plot_cumulative_returns(inital_value:int, view:str, cum_df:pd.DataFrame,  cu
                     y=cum_df[label]*inital_value,
                     mode='lines',
                     name=label,
-                    line=dict(color=scenario_colors[i % len(scenario_colors)], width=line_width),
+                    line=dict(color=scenario_colors[i], width=line_width),
                     opacity=opacity,
                     hovertemplate=f'{label}: %{{y:.2f}}<extra></extra>'
                 ))
@@ -171,32 +168,22 @@ def plot_PCR(sim_PCR_df: pd.DataFrame, baseline_PCR_df: pd.DataFrame):
     """
     Plots bar chart of simulated PCR overlaid with baseline PCR.
     Plots average PCR if Monte Carlo scenario due to low variance; single PCR if Historical Replay.
+
+    Parameters:
+    - sim_PCR_df: Dataframe of PCR from simulated scenario; average of all paths if Monte Carlo secenario
+    - baseline_PCR_df: Dataframe of PCR from the original data the simulations are based on
     """
     try:
         fig = go.Figure()
-
-        #Monte Carlo case: plot average PCR
-        if len(sim_PCR_df) > 1:
-            avg_PCR = sim_PCR_df.astype(float).mean()
-            tickers = avg_PCR.index
-            fig.add_trace(go.Bar(
-                x=tickers,
-                y=avg_PCR.values,
-                name="Simulated Avg PCR",
-                marker_color='#08306b',
-                opacity=0.7,
-            ))
-        else:
-            #Historical Replay: plot single PCR
-            PCR = sim_PCR_df.iloc[0].astype(float)
-            tickers = PCR.index
-            fig.add_trace(go.Bar(
-                x=tickers,
-                y=PCR.values,
-                name="Simulated PCR",
-                marker_color='#08306b',
-                opacity=0.7
-            ))
+        sim_PCR = sim_PCR_df.iloc[0].astype(float)
+        tickers = sim_PCR.index
+        fig.add_trace(go.Bar(
+            x=tickers,
+            y=sim_PCR.values,
+            name="Simulated Avg PCR" if sim_PCR.name[0] == 'Avg PCR' else 'Simulated PCR',
+            marker_color='#08306b',
+            opacity=0.7,
+        ))
 
         #Baseline PCR overlay
         baseline_PCR = baseline_PCR_df.iloc[0].astype(float)
@@ -232,9 +219,14 @@ class SimulationAnalyzer:
     def __init__(self):
         self.mc_batches = {}
         self.hist_batches = {}
+
         self.all_mc_metrics = {}
         self.all_mc_PCR = {}
         self.all_mc_cum_returns = {}
+
+        self.combined_metrics = {}
+        self.combined_PCR = {}
+        self.combined_cum_returns = {}
 
     def add_simulation(self, label:str, type:str, sim_result:dict[str, np.array] | pd.DataFrame):
         """
@@ -262,10 +254,10 @@ class SimulationAnalyzer:
             return None, str(e)
 
 
-    def all_metrics(self, weights:list[float]):
+    def all_MC_metrics(self, weights:list[float]):
         """
-        Computes portfolio metrics and PCR values for each simulation path.
-        Only for monte carlo scenarios.
+        Computes portfolio metrics, PCR values, and cumulative returns for each simulation path.
+        Only for Monte Carlo simulations.
         """
         try:
             for label, sims_returns in self.mc_batches.items():
@@ -301,9 +293,11 @@ class SimulationAnalyzer:
         except Exception as e:
             return None, str(e)
         
+
     def get_display_path(self, label:str, type_path:str, use_metrics=None):
         """ 
-        Returns the metrics of the desired path from the all monte carlo metrics dataframe.
+        Returns the metrics of the desired path from the all Monte Carlo metrics dataframe.
+        Only for Monte Carlo simulations.
 
         Parameters:
         - type_path: Type of path to return -- 'Best', 'Worst', or 'Representative'
@@ -311,7 +305,7 @@ class SimulationAnalyzer:
         """
         try:    
             if type_path != 'Representative':
-                sharpes = self.all_mc_metrics[label]['Sharpe'].values
+                sharpes = self.all_mc_metrics[label]['Sharpe Ratio'].values
 
                 if type_path == 'Best':
                     idx = np.argmax(sharpes)
@@ -321,7 +315,7 @@ class SimulationAnalyzer:
                 
             elif type_path == 'Representative':
                 if use_metrics is None:
-                    use_metrics = ['Annual Volatilty', 'Sharpe', '95% VaR', 'Max Drawdown']
+                    use_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
 
                 metrics_df = self.all_mc_metrics[label]
 
@@ -345,4 +339,156 @@ class SimulationAnalyzer:
             
         except Exception as e:
             return None, str(e)    
+
+
+    def get_combined_metrics(self, weights:list[float]):
+        """ 
+        Combines Monte Carlo and Historical Replay metrics into a single dictionary.
+
+        Parameters:
+        - weights: List of portfolio weights
+        """
+        try:
+            #Add Monte Carlo scenarios (already computed)
+            self.combined_metrics.update(self.all_mc_metrics)
+            self.combined_PCR.update(self.all_mc_PCR)
+            self.combined_cum_returns.update(self.all_mc_cum_returns)
+
+            #Get Historical Replay Metrics
+            for label, hist_data in self.hist_batches.items():
+                results, error = calculate_metrics(weights, hist_data)
+                if error:
+                    raise ValueError(f"Error calculating metrics for {label}: {error}")
+                
+                metrics_df, PCR_df, cum_returns = results
+
+                self.combined_metrics[label] = metrics_df
+                self.combined_PCR[label] = PCR_df
+                self.combined_cum_returns[label] = pd.DataFrame([cum_returns], index=[label])
+            
+            return (self.combined_metrics, self.combined_PCR, self.combined_cum_returns), None
+        
+        except Exception as e:
+            return None, str(e)
+
+
+    def visualize_metrics(self, metric_name):
+        """
+        Create KDE plot of a single portfolio metric across ALL scenarios (Monte Carlo + Historical Replay).
+        Requires weights to be stored as an attribute.
+        
+        Parameters:
+        - metric_name: str, name of the metric to visualize (e.g., 'Sharpe Ratio', 'Annual Volatility', etc.)
+        """
+        try:
+            if not hasattr(self, 'weights'):
+                raise ValueError("Weights must be stored as class attribute to visualize all scenarios")
+                
+            combined_data, error = self.get_combined_metrics(self.weights)
+            if error:
+                raise ValueError(f"Error getting combined metrics: {error}")
+                
+            combined_metrics, _, _ = combined_data
+            
+            # Validate metric_name exists
+            available_metrics = list(next(iter(combined_metrics.values())).columns)
+            if metric_name not in available_metrics:
+                raise ValueError(f"Metric '{metric_name}' not found. Available metrics: {available_metrics}")
+            
+            fig = go.Figure()
+            colors = px.colors.qualitative.Plotly
+            
+            #Get overall range for the metric across all scenarios
+            all_vals = pd.concat([df[metric_name] for df in combined_metrics.values()])
+            x_min, x_max = all_vals.min(), all_vals.max()
+            
+            padding = (x_max - x_min) * 0.05
+            x_range = np.linspace(x_min - padding, x_max + padding, 100)
+
+            for i, (scenario_name, df) in enumerate(combined_metrics.items()):
+                values = df[metric_name].values
+
+                if len(values) > 1: #Monte Carlo case
+                    kde = gaussian_kde(values)
+                    density = kde(x_range)
+                    
+                    fig.add_trace(
+                        go.Scatter(
+                            x=x_range,
+                            y=density,
+                            mode='lines',
+                            name=scenario_name,
+                            line=dict(
+                                color=colors[i],
+                                width=2
+                            ),
+                            hovertemplate=f'<b>{scenario_name}</b><br>' +
+                                        f'{metric_name}: %{{x:.4f}}<br>' +
+                                        'Density: %{y:.4f}<extra></extra>'
+                        )
+                    )
+                    
+                else: #Historical Replay case - only vertical line with legend entry
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[None],
+                            y=[None],
+                            mode='lines',
+                            name=scenario_name,
+                            line=dict(
+                                color=colors[i],
+                                width=3,
+                                dash='dash'
+                            ),
+                            showlegend=True,
+                            hoverinfo='skip'
+                        )
+                    )
+                    
+                    #Add vertical line
+                    fig.add_vline(
+                        x=values[0],
+                        line_dash="dash",
+                        line_color=colors[i],
+                        line_width=3,
+                        opacity=0.8
+                    )
+
+            fig.update_layout(
+                title={
+                    'text': f'KDE Distribution of {metric_name} Across All Scenarios',
+                    'x': 0.5,
+                    'xanchor': 'center',
+                    'font': {'size': 18}
+                },
+                xaxis_title=metric_name,
+                yaxis_title="Density",
+                height=500,
+                width=800,
+                showlegend=True,
+                legend=dict(
+                    orientation="v",
+                    yanchor="top",
+                    y=1,
+                    xanchor="left",
+                    x=1.02
+                ),
+                hovermode='closest',
+                template='plotly_white',
+                xaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(128,128,128,0.2)'
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(128,128,128,0.2)'
+                )
+            )
+            
+            return fig, None
+        
+        except Exception as e:
+            return None, str(e)
         

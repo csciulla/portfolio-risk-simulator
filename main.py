@@ -4,7 +4,7 @@ from src.metrics import calculate_metrics, plot_cumulative_returns, plot_PCR, Si
 import streamlit as st
 import streamlit_shadcn_ui as ui
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import time
 
 #Page config and session state initalization
@@ -67,9 +67,10 @@ def home():
                     'line': None,
                 },
                 'sim_complete': False,
-                'metrics_complete': False,
                 'scenario_ctr': 0,
-                'scenarios': {}
+                'scenarios': {},
+                'sim_analyzer': {'init': False,
+                                 'object': None}
                 }
 
             st.session_state.portfolio_counter += 1
@@ -95,40 +96,39 @@ def render_sidebar():
         if portfolios.keys() is not None:
 
                 for name in portfolios.keys():
-                    st.subheader(f'📁 {name}')
+                    with st.expander(f'📁 {name}', expanded=False):
+                        config_key = f"config_{name}"
+                        sim_key = f"sim_{name}"
+                        metrics_key = f"metrics_{name}"
 
-                    config_key = f"config_{name}"
-                    sim_key = f"sim_{name}"
-                    metrics_key = f"metrics_{name}"
-
-                    #Configuration Button
-                    config_button = st.button("⚙️ Configuration", key=config_key, use_container_width=True,
-                                              type='primary' if st.session_state.current_page == config_key else 'secondary')
-                    if config_button:
-                        st.session_state.current_page = config_key
-                        st.session_state.current_portfolio = name 
-                        st.rerun()
-
-                    #Simulation Button
-                    if portfolios[name]['config_complete']:
-                        sim_button = st.button("🎛️ Simulation", key=sim_key, use_container_width=True,
-                                                type='primary' if st.session_state.current_page == sim_key else 'secondary')
-                        if sim_button:
-                            st.session_state.current_page = sim_key
-                            st.session_state.current_portfolio = name
+                        #Configuration Button
+                        config_button = st.button("⚙️ Config", key=config_key, use_container_width=True,
+                                                type='primary' if st.session_state.current_page == config_key else 'secondary')
+                        if config_button:
+                            st.session_state.current_page = config_key
+                            st.session_state.current_portfolio = name 
                             st.rerun()
 
-                    #Metrics Button
-                    if portfolios[name]['sim_complete']:
-                        metrics_button = st.button("📊 Metrics", key=metrics_key, use_container_width=True,
-                                                type='primary' if st.session_state.current_page == metrics_key else 'secondary')
-                        if metrics_button:
-                            st.session_state.current_page = metrics_key
-                            st.session_state.current_portfolio = name
-                            st.rerun()
+                        #Simulation Button
+                        if portfolios[name]['config_complete']:
+                            sim_button = st.button("🎛️ Simulation", key=sim_key, use_container_width=True,
+                                                    type='primary' if st.session_state.current_page == sim_key else 'secondary')
+                            if sim_button:
+                                st.session_state.current_page = sim_key
+                                st.session_state.current_portfolio = name
+                                st.rerun()
+
+                        #Metrics Button
+                        if portfolios[name]['sim_complete']:
+                            metrics_button = st.button("📊 Metrics", key=metrics_key, use_container_width=True,
+                                                    type='primary' if st.session_state.current_page == metrics_key else 'secondary')
+                            if metrics_button:
+                                st.session_state.current_page = metrics_key
+                                st.session_state.current_portfolio = name
+                                st.rerun()
 
 
-def render_info_box(message:str, icon:str=None, height:int = 300, margin_top:str = "0px", max_width:str = "900px",):
+def render_info_box(message:str, icon:str=None, height:int=300, margin_top:str="0px", max_width:str="900px"):
     """
     Draw a centered info-like box, vertically centered inside a flex container of given height.
 
@@ -234,9 +234,9 @@ def render_timeframe_input(portfolios:dict, name:str):
             period = None
             dcol1, dcol2 = st.columns(2)
             with dcol1:
-                start_date = st.date_input("Enter start date:")
+                start_date = st.date_input("Enter start date:", value=date(2020, 1, 1), min_value=date(1990, 1, 1))
             with dcol2:
-                end_date = st.date_input("Enter end date:")
+                end_date = st.date_input("Enter end date:", value=date.today(), min_value=date(1990, 1, 1), max_value=date.today())
 
     #Display locked state if timeframe already chosen
     else:
@@ -502,15 +502,18 @@ def render_scenario(portfolios:dict, name:str):
             #Initialize # of days and # of sims
             mccol1, mccol2 = st.columns(2)
             with mccol1:
-                sims = st.number_input("Enter the number of simulations:", min_value=1, max_value=1000, value=100)
+                sims = st.number_input("Number of simulations:", min_value=100, max_value=5000, value=1000, step=100)
             with mccol2:
-                T = st.number_input("Enter the number of days in each simulation:", min_value=25, max_value=1000, value=252)
+                T = st.number_input("Number of days:", min_value=25, max_value=1000, value=250, step=25)
+            if sims >= 3000:
+                st.warning("The large amount of simulations may take longer to compute", icon="⚠️")
 
             #Input risk profile
             regime_options = ['Low', 'Medium', 'High']
             regime = st.selectbox("**Current State of the Market:**", regime_options)
-            level_options = ['Mild', 'Moderate', 'Severe', 'Tail Risk', 'Regulatory']
-            level = st.selectbox("**Severity of Market State:**", level_options)
+            level_options = ['1.0x', '1.15x', '1.25x', '1.35x', '1.5x']
+            level = st.selectbox("**Additional Stress Multiplier:**", level_options)
+            st.caption("_Stress multiplier allows you to simulate extreme tail events beyond historical volatility regimes_.")
         
         if sim_method == 'Historical Replay':
             #Choose crisis event
@@ -540,11 +543,11 @@ def render_scenario(portfolios:dict, name:str):
             
             mccol1, mccol2 = st.columns(2)
             with mccol1:
-                st.number_input("Enter the number of simulations:", 
+                st.number_input("Number of simulations:", 
                                        value=scenarios[scenario_name]['# sims'], 
                                        disabled=True)
             with mccol2:
-                st.number_input("Enter the number of days in each simulation:",
+                st.number_input("Number of days:",
                                 value=scenarios[scenario_name]['# days'],
                                 disabled=True)
             
@@ -555,12 +558,13 @@ def render_scenario(portfolios:dict, name:str):
                      index=regime_display_idx,
                      disabled=True)
             
-            level_options = ['Mild', 'Moderate', 'Severe', 'Tail Risk', 'Regulatory']
+            level_options = ['1.0x', '1.15x', '1.25x', '1.35x', '1.5x']
             level_display_idx = level_options.index(scenarios[scenario_name]['level'])
-            st.selectbox("**Severity of Market State:**", 
+            st.selectbox("**Additional Stress Multiplier:**", 
                      level_options,
                      index=level_display_idx,
                      disabled=True)
+            st.caption("_Stress multiplier allows you to simulate extreme tail events beyond historical volatility regimes_.")
                 
         #Locked Historical Replay inputs
         elif scenarios[scenario_name]['sim_method'] == 'Historical Replay':
@@ -600,7 +604,7 @@ def render_classification(portfolios:dict, name:str):
             classifyq = st.checkbox("**Classify your portfolio?**")
             if not classifyq:
                 render_info_box("Classification allows you to understand how your portfolio is exposed to different risk factors.", 
-                                icon='🏷️', max_width='600px', margin_top='30px')
+                                icon='🏷️', max_width='600px', margin_top='48px')
             else:
                 factors_expanded = ['3-factor Fama-French',
                                     '5-factor Fama-French',
@@ -619,7 +623,8 @@ def render_classification(portfolios:dict, name:str):
 
                 return factors
         else:
-            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", icon='🏷️')
+            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", 
+                            icon='🏷️', margin_top='32px')
     
     #Display locked state if scenario exists
     elif scenarios[scenario_name]['sim_method'] == 'Monte Carlo' and scenarios[scenario_name]['factors']:
@@ -650,9 +655,10 @@ def render_classification(portfolios:dict, name:str):
         if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
             st.checkbox("**Classify your portfolio?**", value=False, disabled=True)
             render_info_box("Classification allows you to understand how your portfolio is exposed to different risk factors.", 
-                            icon = '🏷️', max_width='600px', margin_top='30px')
+                            icon = '🏷️', max_width='600px', margin_top='48px')
         else:
-            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", icon='🏷️')
+            render_info_box("Classification inputs are only available for Monte Carlo scenarios.", 
+                            icon='🏷️', margin_top='52px')
 
         return None
 
@@ -682,7 +688,7 @@ def render_shocks(portfolios:dict, name:str, factors:list):
         
         #No shocks desired
         else:   
-            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-60px')
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-40px')
 
             return {}
             
@@ -739,7 +745,7 @@ def render_shocks(portfolios:dict, name:str, factors:list):
         else:
             st.checkbox("**Would you like to induce factor-stress into the simulation?**", value=False, disabled=True)
             st.caption("_FF3/FF5 apply uniform stress. Select individual factors for asymmetric shocks._")
-            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-60px')
+            render_info_box("No factor shocks haven been applied to this scenario.", icon='⚡', margin_top='-40px')
 
             return {}
 
@@ -757,7 +763,7 @@ def simulation_config():
     scol1, scol2 = st.columns(2)
 
     with scol1:
-        with st.container(border=True):
+        with st.container(border=True, height=610):
             st.markdown("#### Scenario Builder")
             result = render_scenario(portfolios, name)
             if result:
@@ -765,17 +771,7 @@ def simulation_config():
                 factors = s_means = s_means_warning = None
 
     with scol2:
-        if sim_method == 'Historical Replay':
-            container = st.container(border=True, height=381)
-        elif sim_method == 'Monte Carlo':
-            container = st.container(border=True, height=570)
-        else:
-            if scenarios[scenario_name]['sim_method'] == 'Historical Replay':
-                container = st.container(border=True, height=381)
-            elif scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
-                container = st.container(border=True, height=570)
-                
-        with container:
+        with st.container(border=True, height=610):
             st.markdown("#### Classification & Factor Shocks")
             factors = render_classification(portfolios, name)
 
@@ -836,13 +832,14 @@ def simulation_config():
                                     'stressed_means': {'means': s_means,
                                                        'warning': s_means_warning},
                                     'results': results,
+                                    'display_paths': None
                                     }
                                 
                         elif sim_method == 'Historical Replay':
                             scenarios[final_scenario_name] = {
                                 'sim_method': sim_method,
                                 'crisis': crisis,
-                                'results': results,
+                                'results': results
                                 }
                             
                         portfolios[name]['scenario_ctr'] += 1
@@ -859,7 +856,7 @@ def simulation_config():
     scenario_create = st.button("Create Another Scenario?", use_container_width=True)
     if scenario_create:
         st.session_state.current_scenario = None
-        st.success("Scenario sucessfully intialized!", icon="✅")
+        st.success("Scenario sucessfully initialized!", icon="✅")
         st.rerun()
 
     #Scenario selectbox
@@ -881,7 +878,11 @@ def render_metric_cards(portfolios:dict, name:str):
     Renders metric cards for a select scenario with comparision to baseline metrics.
     """
     scenarios = portfolios[name]['scenarios']
+
+    if ('current_scenario' not in st.session_state or st.session_state.current_scenario not in scenarios):
+        st.session_state.current_scenario = list(scenarios.keys())[0]
     scenario_name = st.session_state.current_scenario
+
     weights = portfolios[name]['configs']['weights']
     baseline_df = portfolios[name]['configs']['df']
     scenario_labels = []
@@ -894,35 +895,40 @@ def render_metric_cards(portfolios:dict, name:str):
     
     baseline_metrics = baseline_result[0]
 
-    if st.session_state.sim_analyzer is None:
+    if st.session_state.sim_analyzer is None or not portfolios[name]['sim_analyzer']['init']:
         S = SimulationAnalyzer()
+        S.weights = weights
         st.session_state.sim_analyzer = S
+        portfolios[name]['sim_analyzer']['init'] = True
+        portfolios[name]['sim_analyzer']['object'] = S
     else:
-        S = st.session_state.sim_analyzer   
+        S = portfolios[name]['sim_analyzer']['object'] 
+        st.session_state.sim_analyzer = S
 
     for label, data in scenarios.items():
+        scenario_labels.append(label)
         if label not in S.mc_batches and label not in S.hist_batches:
-            scenario_labels.append(label)
             sim_returns = data['results']
             sim_type = data['sim_method']
-            hist_batches, add_error = S.add_simulation(label, sim_type, sim_returns) #add_simulations returns historical replay results
+            hist_batches, add_error = S.add_simulation(label, sim_type, sim_returns) #add_simulation returns historical replay results
             if add_error:
                 st.error(f"Error adding simulation {label}: {add_error}", icon='❌')
                 return
-        else:
-            scenario_labels.append(label)
-            sim_returns = data['results']
-            sim_type = data['sim_method']
-            hist_batches = S.hist_batches
+    
+    #Gather all Monte Carlo metrics for each sim and combine all metrics across all sims
+    if S.mc_batches:
+        _, mc_error = S.all_MC_metrics(weights)
+        if mc_error:
+            st.error(f"Error calculating Monte Carlo metrics: {mc_error}", icon='❌')
+        
+    combined_results, combined_error = S.get_combined_metrics(weights)
+    if combined_error:
+        st.error(f"Error getting combined metrics: {combined_error}", icon='❌')
+        return 
+    combined_metrics = combined_results[0]
 
     current_sim_type = scenarios[scenario_name]['sim_method']
-    
     if current_sim_type == 'Monte Carlo': #Monte Carlo case
-        _, concat_error = S.all_metrics(weights)
-        if concat_error:
-            st.error(f"Error calculating all scenario metrics: {concat_error}", icon='❌')
-            return
-
         #Select scenario
         scol1, scol2 = st.columns(2)
         with scol1:
@@ -938,14 +944,22 @@ def render_metric_cards(portfolios:dict, name:str):
                 st.rerun()
             
         #Get desired path type data
-        current_scenario = st.session_state.current_scenario
+        scenario_name = st.session_state.current_scenario
         current_path = st.session_state.current_path_type
-        results, get_path_error = S.get_display_path(current_scenario, current_path)
-        if get_path_error:
-            st.error(f"Error getting display path: {get_path_error}", icon='❌')
-            return 
+        if scenarios[scenario_name]['display_paths'] is None:
+            repr_results, repr_error = S.get_display_path(scenario_name, 'Representative')
+            best_results, best_error = S.get_display_path(scenario_name, 'Best')
+            worst_results, worst_error = S.get_display_path(scenario_name, 'Worst')
+            if repr_error or best_error or worst_error:
+                st.error(f"Error getting display path: {repr_error or best_error or worst_error}", icon='❌')
+                return 
             
-        metrics = results[0]
+            scenarios[scenario_name]['display_paths'] = {
+                'Representative': repr_results,
+                'Best': best_results,
+                'Worst': worst_results
+            }
+        metrics = scenarios[scenario_name]['display_paths'][current_path][0]
 
     else: #Historical Replay case
         select_scenario = st.selectbox("**Select Scenario to View:**", scenario_labels, index=scenario_labels.index(scenario_name))
@@ -955,18 +969,15 @@ def render_metric_cards(portfolios:dict, name:str):
             st.rerun()
 
         #Use the current session state value instead of the old scenario_name
-        current_scenario = st.session_state.current_scenario
-        hist_data = hist_batches[current_scenario]
-        results, results_error = calculate_metrics(weights, hist_data)
-        if results_error:
-            st.error("Error calculating current historical replay metrics", icon='❌')
-            return
-    
-        metrics = results[0]
+        scenario_name = st.session_state.current_scenario
+        if scenario_name in combined_metrics:
+            metrics = combined_metrics[scenario_name].loc['Portfolio']
+        else:
+            st.error(f"Scenario {scenario_name} not found in combined metrics", icon='❌')
 
     #Display metric cards
-    default_metrics = ['Annual Volatilty', 'Sharpe', '95% VaR', 'Max Drawdown']
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    default_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
+    mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
 
     with mcol1: # Annual Volatility
         metric_val = float(metrics[default_metrics[0]])
@@ -974,43 +985,104 @@ def render_metric_cards(portfolios:dict, name:str):
         vol_delta = metric_val - baseline_val
         st.metric(label=default_metrics[0], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", delta_color='inverse', border=True)
         
-    with mcol2: #Sharpe Ratio
+    with mcol2: #Expected Return
         metric_val = float(metrics[default_metrics[1]])
         baseline_val = float(baseline_metrics[default_metrics[1]])
-        sharpe_delta = metric_val - baseline_val
-        st.metric(default_metrics[1], f"{metric_val:.4f}", f"{sharpe_delta:.4f}", border=True)
-        
-    with mcol3: #95% VaR
+        vol_delta = metric_val - baseline_val
+        st.metric(label=default_metrics[1], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", border=True)
+
+    with mcol3: #Sharpe Ratio
         metric_val = float(metrics[default_metrics[2]])
         baseline_val = float(baseline_metrics[default_metrics[2]])
-        VaR_delta = metric_val - baseline_val
-        st.metric(default_metrics[2], f"{metric_val:.4f}", f"{VaR_delta:.4f}", border=True)
+        sharpe_delta = metric_val - baseline_val
+        st.metric(default_metrics[2], f"{metric_val:.4f}", f"{sharpe_delta:.4f}", border=True)
         
-    with mcol4: #Max Drawdown
+    with mcol4: #95% VaR
         metric_val = float(metrics[default_metrics[3]])
         baseline_val = float(baseline_metrics[default_metrics[3]])
+        VaR_delta = metric_val - baseline_val
+        st.metric(default_metrics[3], f"{metric_val:.4f}", f"{VaR_delta:.4f}", border=True)
+        
+    with mcol5: #Max Drawdown
+        metric_val = float(metrics[default_metrics[4]])
+        baseline_val = float(baseline_metrics[default_metrics[4]])
         mdd_delta = metric_val - baseline_val
-        st.metric(default_metrics[3], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
-    
-    st.caption("- _Current metrics are compared to original portfolio data as a baseline_")
-    st.caption("- _Representative Monte Carlo path is the 'highest probable' path of the simulation_")
-    st.caption("- _Best and Worst Monte Carlo path are based on Sharpe Ratio_")
+        st.metric(default_metrics[4], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
+
+def render_divider(portfolios:dict, name:str):
+    """ 
+    Renders info captions for metrics and final portfolio value.
+    """
+    initial_value = portfolios[name]['configs']['portfolio_value']
+    scenarios = portfolios[name]['scenarios']
+    current_path = st.session_state.current_path_type
+    sim_analyzer = st.session_state.sim_analyzer
+
+    if ('current_scenario' not in st.session_state or st.session_state.current_scenario not in scenarios):
+        st.session_state.current_scenario = list(scenarios.keys())[0]
+    scenario_name = st.session_state.current_scenario
+
+    dcol1, dcol2 = st.columns(2)
+    with dcol1: #Final portfolio value
+        if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
+            cum_returns = scenarios[scenario_name]['display_paths'][current_path][2]
+        elif scenarios[scenario_name]['sim_method'] == 'Historical Replay':
+            cum_returns = sim_analyzer.combined_cum_returns[scenario_name]
+
+        final_portfolio_value = initial_value*cum_returns.iloc[-1]
+        PnL = final_portfolio_value - initial_value
+        if PnL >= 0:
+            color = '#00c851'
+        else:
+            color = '#ff4b4b'
+
+        st.markdown(f"""
+        <div style="
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 15px 20px;
+            border-radius: 6px;
+            border-left: 3px solid {color};
+            margin: 10px 0;
+        ">
+            <strong>Final Portfolio Value:</strong> 
+            <span style="color: {color}; font-size: 20px; font-weight: bold;">
+                ${final_portfolio_value:,.2f}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with dcol2: #Info captions
+            st.markdown("""
+            • **Current metrics are compared to original portfolio data as a baseline**
+
+            • **Representative Monte Carlo path is the "highest probable" path**
+            
+            • **Best and Worst Monte Carlo path are based on Sharpe Ratio**
+            """)
 
 
 def render_cumulative_returns(portfolios:dict, name:str):
     """
     Renders final portfolio value and cumulative returns line chart.
     """
-    intial_value = portfolios[name]['configs']['portfolio_value']
+    initial_value = portfolios[name]['configs']['portfolio_value']
     scenarios = portfolios[name]['scenarios']
+
+    if ('current_scenario' not in st.session_state or st.session_state.current_scenario not in scenarios):
+        st.session_state.current_scenario = list(scenarios.keys())[0]
     scenario_name = st.session_state.current_scenario
+
     current_path = st.session_state.current_path_type
     sim_analyzer = st.session_state.sim_analyzer
 
     has_monte_carlo = any(scenarios[s]['sim_method'] == 'Monte Carlo' for s in scenarios)
     has_multiple_scenarios = len(scenarios.keys()) > 1
 
-    if scenarios[scenario_name]['sim_method'] == 'Monte Carlo': #Monte Carlo scenario
+    #Get combined cumulative returns 
+    combined_cum_returns = sim_analyzer.combined_cum_returns
+
+    #Monte Carlo scenario
+    if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
         if has_multiple_scenarios:
             view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True)
         else:
@@ -1021,20 +1093,17 @@ def render_cumulative_returns(portfolios:dict, name:str):
 
     if view_mode == 'Detailed View': #Shows all three path cumulative returns for selected scenario
         st.caption("_Plots representative, best, and worst path of current Monte Carlo scenario_")
-        repr_results, repr_error = sim_analyzer.get_display_path(scenario_name, 'Representative')
-        best_results, best_error = sim_analyzer.get_display_path(scenario_name, 'Best')
-        worst_results, worst_error = sim_analyzer.get_display_path(scenario_name, 'Worst')
-        if repr_error or best_error or worst_error:
-            st.error(f"Error getting display paths: {repr_error or best_error or worst_error}", icon='❌')
-            return
-        
+        repr_results = scenarios[scenario_name]['display_paths']['Representative']
+        best_results = scenarios[scenario_name]['display_paths']['Best']
+        worst_results = scenarios[scenario_name]['display_paths']['Worst']
+
         #Cumulative returns
         repr_cum_returns, best_cum_returns, worst_cum_returns = repr_results[2], best_results[2], worst_results[2]
         cum_returns_df = pd.concat([repr_cum_returns, best_cum_returns, worst_cum_returns], axis=1)
         cum_returns_df.columns = ['Representative', 'Best', 'Worst']
 
         #Plot
-        plot_cum, plot_cum_error = plot_cumulative_returns(intial_value, view_mode, cum_returns_df, current_scenario=scenario_name, current_path=current_path)
+        plot_cum, plot_cum_error = plot_cumulative_returns(initial_value, view_mode, cum_returns_df, current_scenario=scenario_name, current_path=current_path)
         if plot_cum_error:
             st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
             return
@@ -1045,35 +1114,38 @@ def render_cumulative_returns(portfolios:dict, name:str):
         all_cum_returns = {}
         for label in scenarios.keys():
             if scenarios[label]['sim_method'] == 'Monte Carlo':
-                cum_results, cum_error = sim_analyzer.get_display_path(label, 'Representative')
-                if cum_error:
-                    st.error(f"Error getting display path: {cum_error}", icon='❌')
-                    return
+                if scenarios[label]['display_paths']['Representative'] is not None:
+                    repr_results = scenarios[label]['display_paths']['Representative']
+                else:
+                    repr_results, repr_error = sim_analyzer.get_display_path(label, 'Representative')
+                    if repr_error:
+                        st.error(f"Error getting display path: {repr_error}", icon='❌')
+                        return
+                all_cum_returns[label] = repr_results[2]
                 
             elif scenarios[label]['sim_method'] == 'Historical Replay':
-                hist_data = sim_analyzer.hist_batches[label]
-                cum_results, cum_error = calculate_metrics(portfolios[name]['configs']['weights'], hist_data)
-                if cum_error:
-                    st.error(f"Error calculating metrics for historical replay: {cum_error}", icon='❌')
-                    return
+                all_cum_returns[label] = combined_cum_returns[label].iloc[0]
 
-            all_cum_returns[label] = cum_results[2]
-        
         all_repr_df = pd.DataFrame(all_cum_returns)
         
         #Plot
-        plot_cum, plot_cum_error = plot_cumulative_returns(intial_value, view_mode, all_repr_df, current_scenario=scenario_name)
+        plot_cum, plot_cum_error = plot_cumulative_returns(initial_value, view_mode, all_repr_df, current_scenario=scenario_name)
         if plot_cum_error:
             st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
             return
         st.plotly_chart(plot_cum, use_container_width=True)
+
 
 def render_PCR(portfolios:dict, name:str):
     """ 
     Renders Percent Contribution of Risk bar chart overlaid with baseline PCR.
     """
     scenarios = portfolios[name]['scenarios']
+
+    if ('current_scenario' not in st.session_state or st.session_state.current_scenario not in scenarios):
+        st.session_state.current_scenario = list(scenarios.keys())[0]
     scenario_name = st.session_state.current_scenario
+
     sim_analyzer = st.session_state.sim_analyzer
     weights = portfolios[name]['configs']['weights']
     baseline_df = portfolios[name]['configs']['df']
@@ -1085,22 +1157,15 @@ def render_PCR(portfolios:dict, name:str):
         return
     baseline_PCR = baseline_result[1]
     
+    combined_PCR = sim_analyzer.combined_PCR
+
     #Get current PCR dataframe
     if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
-        all_metrics, all_metrics_error = sim_analyzer.all_metrics(weights)
-        if all_metrics_error:
-            st.error(f"Error in grabbing all simulation metrics: {all_metrics_error}", icon='❌')
-            return
-        all_PCR = all_metrics[1]
-        current_PCR = all_PCR[scenario_name]
+        current_PCR = sim_analyzer.all_mc_PCR[scenario_name].mean()
+        current_PCR = pd.DataFrame({'Avg PCR': current_PCR}).T
         st.caption("_Monte Carlo PCR is computed by averaging every paths individual PCR_")
     else:
-        hist_data = sim_analyzer.hist_batches[scenario_name]
-        hist_results, results_error = calculate_metrics(weights, hist_data)
-        if results_error:
-            st.error("Error calculating current historical replay metrics", icon='❌')
-            return
-        current_PCR = hist_results[1]
+        current_PCR = combined_PCR[scenario_name]
         st.caption("_Historical Replay PCR only takes into account the crisis period_")
     #Plot
     plot_pcr, plot_pcr_error = plot_PCR(current_PCR, baseline_PCR)
@@ -1108,6 +1173,29 @@ def render_PCR(portfolios:dict, name:str):
         st.error(f"Error plotting PCR: {plot_pcr_error}", icon='❌')
         return
     st.plotly_chart(plot_pcr, use_container_width=True)
+
+
+def render_visualize_metrics():
+    """ 
+    Renders KDEs comparing each metric across scenarios.
+    """
+    sim_analyzer = st.session_state.sim_analyzer
+
+    with st.container(border=True):
+        st.markdown("#### KDE Comparison of Portfolio Metrics Across Simulations")
+        
+        if len(sim_analyzer.mc_batches.keys()) == 0:
+            render_info_box("KDE plots require at least one Monte Carlo simulation to display.", icon='📊')
+        else:
+            default_metrics = ['Annual Volatilty', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
+            metric_choice = st.selectbox("**Choose Metric KDE to Display**:", default_metrics)
+
+            plot_metrics, plot_metrics_error = sim_analyzer.visualize_metrics(metric_choice)
+            if plot_metrics_error:
+                st.error(f"Error in plotting metric KDEs: {plot_metrics_error}")
+                return
+            else:
+                st.plotly_chart(plot_metrics, use_container_width=True)
 
 
 def metrics():
@@ -1121,16 +1209,19 @@ def metrics():
     st.header("Metrics & Visualization", divider=True)
 
     render_metric_cards(portfolios, name)
+    render_divider(portfolios, name)
 
     mcol1, mcol2 = st.columns(2)
     with mcol1:
-        with st.container(border=True):
+        with st.container(border=True, height=670):
             st.markdown("#### Cumulative Portfolio Value")
             render_cumulative_returns(portfolios, name)
     with mcol2:
-        with st.container(border=True, height=680):
+        with st.container(border=True, height=670):
             st.markdown("#### Percent Contribution of Risk")
             render_PCR(portfolios, name)
+
+    render_visualize_metrics()
 
 
 def main():
