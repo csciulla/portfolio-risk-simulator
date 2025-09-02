@@ -122,32 +122,32 @@ def render_metric_cards(portfolios:dict, name:str):
     mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
 
     with mcol1: # Annual Volatility
-        metric_val = float(metrics[default_metrics[0]])
-        baseline_val = float(baseline_metrics[default_metrics[0]])
+        metric_val = float(metrics.at['Portfolio', default_metrics[0]])
+        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[0]])
         vol_delta = metric_val - baseline_val
         st.metric(label=default_metrics[0], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", delta_color='inverse', border=True)
         
     with mcol2: #Expected Return
-        metric_val = float(metrics[default_metrics[1]])
-        baseline_val = float(baseline_metrics[default_metrics[1]])
+        metric_val = float(metrics.at['Portfolio', default_metrics[1]])
+        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[1]])
         vol_delta = metric_val - baseline_val
         st.metric(label=default_metrics[1], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", border=True)
 
     with mcol3: #Sharpe Ratio
-        metric_val = float(metrics[default_metrics[2]])
-        baseline_val = float(baseline_metrics[default_metrics[2]])
+        metric_val = float(metrics.at['Portfolio', default_metrics[2]])
+        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[2]])
         sharpe_delta = metric_val - baseline_val
         st.metric(default_metrics[2], f"{metric_val:.4f}", f"{sharpe_delta:.4f}", border=True)
         
     with mcol4: #95% VaR
-        metric_val = float(metrics[default_metrics[3]])
-        baseline_val = float(baseline_metrics[default_metrics[3]])
+        metric_val = float(metrics.at['Portfolio', default_metrics[3]])
+        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[3]])
         VaR_delta = metric_val - baseline_val
         st.metric(default_metrics[3], f"{metric_val:.4f}", f"{VaR_delta:.4f}", border=True)
         
     with mcol5: #Max Drawdown
-        metric_val = float(metrics[default_metrics[4]])
-        baseline_val = float(baseline_metrics[default_metrics[4]])
+        metric_val = float(metrics.at['Portfolio', default_metrics[4]])
+        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[4]])
         mdd_delta = metric_val - baseline_val
         st.metric(default_metrics[4], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
 
