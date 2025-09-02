@@ -50,7 +50,7 @@ def home():
 
     #Create Portfolio button
     with st.container(border=True):
-        st.markdown("### 🚀 Create Portfolio")
+        st.markdown("#### 🚀 Create Portfolio")
         port_ct = st.session_state.portfolio_counter
         placeholder_name = f"Portfolio {port_ct}"
         name = st.text_input("**Input a Portfolio Name:**", placeholder=placeholder_name, max_chars=30)
@@ -79,7 +79,8 @@ def home():
                     'weight_allocation': {'method': None,
                                             'lbound': None,
                                             'ubound': None},
-                    'df': None,
+                    'df': {'data': None,
+                           'warning': None},
                     'weights': None,
                     'pie': None,
                     'line': None,

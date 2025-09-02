@@ -66,7 +66,9 @@ def render_timeframe_input(portfolios:dict, name:str):
         
         if time_select == 'Quick Select':
             start_date = end_date = None
-            period = st.select_slider("Choose a period:", full_choices)
+            period = st.select_slider("Choose a period:", full_choices, value='1y')
+            if period in ['1mo', '2mo', '3mo']:
+                st.warning("Factor classification will be unable due an insufficient amount of data.", icon="⚠️")
 
         elif time_select == 'Custom Date Range':
             period = None
@@ -75,6 +77,9 @@ def render_timeframe_input(portfolios:dict, name:str):
                 start_date = st.date_input("Enter start date:", value=date(2020, 1, 1), min_value=date(1990, 1, 1))
             with dcol2:
                 end_date = st.date_input("Enter end date:", value=date.today(), min_value=date(1990, 1, 1), max_value=date.today())
+            
+            if (end_date - start_date).days < 70:
+                st.warning("Factor classification will be unable due an insufficient amount of data.", icon="⚠️")
 
     #Display locked state if timeframe already chosen
     else:
@@ -207,7 +212,7 @@ def render_pie(portfolios:dict, name:str):
             render_info_box("Portfolio pie chart will appear here once data is downloaded.",
                             icon='📊', height=360, margin_top="30px")
         else:
-            st.plotly_chart(portfolios[name]['configs']['pie'], use_container_width=True)
+            st.plotly_chart(portfolios[name]['configs']['pie'], width='stretch')
 
     
 def render_line(portfolios:dict, name:str):
@@ -223,7 +228,7 @@ def render_line(portfolios:dict, name:str):
     else:
         with st.container(border=True):
             st.markdown("#### Normalized Portfolio Performance")
-            st.plotly_chart(portfolios[name]['configs']['line'], use_container_width=True)
+            st.plotly_chart(portfolios[name]['configs']['line'], width='stretch')
     
 
 def portfolio_config():
@@ -246,13 +251,13 @@ def portfolio_config():
             type_weight, lbound, ubound, custom_weights_list = render_weight_input(portfolios, name, tickers)
 
             #Download button
-            if st.button("Download Portfolio Data", use_container_width=True):
+            if st.button("Download Portfolio Data", width='stretch'):
                 with st.spinner("Downloading portfolio data..."):
                     try:
                         #Use cached data download
                         df, df_error, df_warning = cached_get_data(tickers, lbound, ubound, period=period, start_date=start_date, end_date=end_date)
                         if df_warning:
-                            st.warning(f"Warning: {df_warning}", icon = "⚠️")
+                            st.warning(df_warning, icon="⚠️")
 
                         #Get weights
                         if type_weight == 'custom' and custom_weights_list:
@@ -302,7 +307,8 @@ def portfolio_config():
                             portfolios[name]['configs']['weight_allocation']['method'] = type_weight
                             portfolios[name]['configs']['weight_allocation']['lbound'] = lbound
                             portfolios[name]['configs']['weight_allocation']['ubound'] = ubound
-                            portfolios[name]['configs']['df'] = df
+                            portfolios[name]['configs']['df']['data'] = df
+                            portfolios[name]['configs']['df']['warning'] = df_warning
                             portfolios[name]['configs']['weights'] = weights
                             portfolios[name]['configs']['pie'] = pie_chart
                             portfolios[name]['configs']['line'] = line_chart

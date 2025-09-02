@@ -124,6 +124,14 @@ def render_classification(portfolios:dict, name:str):
     scenario_name = st.session_state.current_scenario
     scenarios = portfolios[name]['scenarios']
 
+    #Check if there is enough data or not any incomplete tickers to render classification
+    if len(portfolios[name]['configs']['df']['data']) < 70: 
+        render_info_box("Classification requires more historical data", icon='⚠️', margin_top='48px', bg='#3D3B15', txt="#FCF4BA", border="#1D1D14")
+        return None
+    if  portfolios[name]['configs']['df']['warning'] is not None:
+        render_info_box("Classification unavailable due to incomplete ticker data", icon='⚠️', margin_top='48px', bg='#3D3B15', txt="#FCF4BA", border="#1D1D14")
+        return None
+    
     #Derive current sim method from unconfirmed scenario
     if scenario_name is None or scenario_name not in scenarios:
         sim_method = st.session_state.current_sim_method
@@ -305,7 +313,7 @@ def simulation_config():
 
             shocks = None
             if factors is not None:
-                df = portfolios[name]['configs']['df']
+                df = portfolios[name]['configs']['df']['data']
                 f = FactorStress(df)
                 
                 #Run factor functions
@@ -319,24 +327,24 @@ def simulation_config():
                 else:
                     #Display classification
                     if not classify_df.empty:
-                        st.dataframe(classify_df, use_container_width=True)
+                        st.dataframe(classify_df, width='stretch')
                     shocks = render_shocks(portfolios, name, factors)
                     if shocks:
                         s_means, s_means_error, s_means_warning = f.stress_means(shocks)
                         if s_means_error:
                             st.error(f"Error in stressing means: {s_means_error}", icon="❌")
                         elif s_means_warning:
-                            st.warning(f"Warning: {s_means_warning}", icon="⚠️")
+                            st.warning(s_means_warning, icon="⚠️")
 
     #Confirmation Button
     if final_scenario_name in scenarios or st.session_state.current_scenario in scenarios:
-        st.button("Confirm Scenario", use_container_width=True, disabled=True)
+        st.button("Confirm Scenario", width='stretch', disabled=True)
     else:
-        confirm = st.button("Confirm Scenario", use_container_width=True)
+        confirm = st.button("Confirm Scenario", width='stretch')
         if confirm:
             with st.spinner("Running simulation..."):
                 try:
-                    df = portfolios[name]['configs']['df']
+                    df = portfolios[name]['configs']['df']['data']
                     weights = portfolios[name]['configs']['weights']
                     
                     if sim_method == 'Monte Carlo':
@@ -393,7 +401,7 @@ def simulation_config():
                     st.error(f"Simulation failed: {str(e)}", icon='❌')
 
     #Create another scenario
-    scenario_create = st.button("Create Another Scenario?", use_container_width=True)
+    scenario_create = st.button("Create Another Scenario?", width='stretch')
     if scenario_create:
         st.session_state.current_scenario = None
         st.success("Scenario sucessfully initialized!", icon="✅")

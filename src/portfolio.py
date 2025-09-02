@@ -86,7 +86,7 @@ class Portfolio:
                 partially_missing_tickers.append(f"{ticker} ({ticker_nan_count}/{ticker_size} missing)")
         
         if partially_missing_tickers:
-           warning = f"Warning: Significant missing data detected: {', '.join(partially_missing_tickers)}. Proceed with caution."
+           warning = f"Significant missing data detected: {', '.join(partially_missing_tickers)}. Proceed with caution."
 
       return self.portfolio_df, None, warning
 

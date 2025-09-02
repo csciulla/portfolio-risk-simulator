@@ -1,7 +1,7 @@
 import streamlit as st
 
 
-def render_info_box(message:str, icon:str=None, height:int=300, margin_top:str="0px", max_width:str="900px"):
+def render_info_box(message:str, icon:str=None, height:int=300, margin_top:str="0px", max_width:str="900px", bg:str="#2171b5", txt:str = "#ffffff", border:str='#4292c6'):
     """
     Draw a centered info-like box, vertically centered inside a flex container of given height.
 
@@ -12,9 +12,6 @@ def render_info_box(message:str, icon:str=None, height:int=300, margin_top:str="
     - margin_top: CSS margin-top value for pushing the whole placeholder down (e.g. "20px")
     - max_width: max width of the info box (keeps it from being full width)
     """
-    bg = "#2171b5"   
-    txt = "#ffffff"
-    border = '#4292c6'
 
     if icon:
         content = f'<span style="font-size: 28px; margin-right: 8px;">{icon}</span>{message}'

@@ -19,7 +19,7 @@ def render_metric_cards(portfolios:dict, name:str):
     scenario_name = st.session_state.current_scenario
 
     weights = portfolios[name]['configs']['weights']
-    baseline_df = portfolios[name]['configs']['df']
+    baseline_df = portfolios[name]['configs']['df']['data']
     scenario_labels = []
 
     #Get metrics
@@ -121,33 +121,33 @@ def render_metric_cards(portfolios:dict, name:str):
     default_metrics = ['Annual Volatility', 'Expected Return', 'Sharpe Ratio', '95% VaR', 'Max Drawdown']
     mcol1, mcol2, mcol3, mcol4, mcol5 = st.columns(5)
 
-    with mcol1: # Annual Volatility
-        metric_val = float(metrics.at['Portfolio', default_metrics[0]])
-        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[0]])
+    with mcol1: #Annual Volatility
+        metric_val = metrics[default_metrics[0]].item()
+        baseline_val = baseline_metrics[default_metrics[0]].item()
         vol_delta = metric_val - baseline_val
         st.metric(label=default_metrics[0], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", delta_color='inverse', border=True)
         
     with mcol2: #Expected Return
-        metric_val = float(metrics.at['Portfolio', default_metrics[1]])
-        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[1]])
+        metric_val = metrics[default_metrics[1]].item()
+        baseline_val = baseline_metrics[default_metrics[1]].item()
         vol_delta = metric_val - baseline_val
         st.metric(label=default_metrics[1], value=f"{metric_val:.4f}", delta=f"{vol_delta:.4f}", border=True)
 
     with mcol3: #Sharpe Ratio
-        metric_val = float(metrics.at['Portfolio', default_metrics[2]])
-        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[2]])
+        metric_val = metrics[default_metrics[2]].item()
+        baseline_val = baseline_metrics[default_metrics[2]].item()
         sharpe_delta = metric_val - baseline_val
         st.metric(default_metrics[2], f"{metric_val:.4f}", f"{sharpe_delta:.4f}", border=True)
         
     with mcol4: #95% VaR
-        metric_val = float(metrics.at['Portfolio', default_metrics[3]])
-        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[3]])
+        metric_val = metrics[default_metrics[3]].item()
+        baseline_val = baseline_metrics[default_metrics[3]].item()
         VaR_delta = metric_val - baseline_val
         st.metric(default_metrics[3], f"{metric_val:.4f}", f"{VaR_delta:.4f}", border=True)
         
     with mcol5: #Max Drawdown
-        metric_val = float(metrics.at['Portfolio', default_metrics[4]])
-        baseline_val = float(baseline_metrics.at['Portfolio', default_metrics[4]])
+        metric_val = metrics[default_metrics[4]].item()
+        baseline_val = baseline_metrics[default_metrics[4]].item()
         mdd_delta = metric_val - baseline_val
         st.metric(default_metrics[4], f"{metric_val:.4f}", f"{mdd_delta:.4f}", border=True)
 
@@ -250,7 +250,7 @@ def render_cumulative_returns(portfolios:dict, name:str):
         if plot_cum_error:
             st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
             return
-        st.plotly_chart(plot_cum, use_container_width=True)
+        st.plotly_chart(plot_cum, width='stretch')
     
     elif view_mode == 'Compare Scenarios': #Compares representative paths of all scenarios
         st.caption('_Compares representative path of Monte Carlo scenarios to Historical Replay scenarios_')
@@ -276,7 +276,7 @@ def render_cumulative_returns(portfolios:dict, name:str):
         if plot_cum_error:
             st.error(f"Error plotting cumulative returns: {plot_cum_error}", icon='❌')
             return
-        st.plotly_chart(plot_cum, use_container_width=True)
+        st.plotly_chart(plot_cum, width='stretch')
 
 
 def render_PCR(portfolios:dict, name:str):
@@ -291,7 +291,7 @@ def render_PCR(portfolios:dict, name:str):
 
     sim_analyzer = st.session_state.sim_analyzer
     weights = portfolios[name]['configs']['weights']
-    baseline_df = portfolios[name]['configs']['df']
+    baseline_df = portfolios[name]['configs']['df']['data']
 
     #Get baseline PCR dataframe
     baseline_result, baseline_error = calculate_metrics(weights, baseline_df)
@@ -315,7 +315,7 @@ def render_PCR(portfolios:dict, name:str):
     if plot_pcr_error:
         st.error(f"Error plotting PCR: {plot_pcr_error}", icon='❌')
         return
-    st.plotly_chart(plot_pcr, use_container_width=True)
+    st.plotly_chart(plot_pcr, width='stretch')
 
 
 def render_visualize_metrics():
@@ -338,7 +338,7 @@ def render_visualize_metrics():
                 st.error(f"Error in plotting metric KDEs: {plot_metrics_error}")
                 return
             else:
-                st.plotly_chart(plot_metrics, use_container_width=True)
+                st.plotly_chart(plot_metrics, width='stretch')
 
 
 def metrics():
