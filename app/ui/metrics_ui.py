@@ -353,17 +353,16 @@ def metrics():
     """
     portfolios = st.session_state.portfolios
     name = st.session_state.current_portfolio
-    scenarios = portfolios[name]['scenarios']
-    scenario_name = st.session_state.current_scenario
-    st.header("Metrics & Visualization", divider=True)
 
+    st.header("Metrics & Visualization", divider=True)
+    
     render_metric_cards(portfolios, name)
     render_divider(portfolios, name)
 
     mcol1, mcol2 = st.columns(2)
     with mcol1:
         with st.container(border=True, height=670):
-            st.markdown("#### Cumulative Portfolio Value")
+            st.markdown("#### Equity Curve")
             render_cumulative_returns(portfolios, name)
     with mcol2:
         with st.container(border=True, height=670):

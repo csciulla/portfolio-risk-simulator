@@ -251,74 +251,78 @@ def portfolio_config():
             type_weight, lbound, ubound, custom_weights_list = render_weight_input(portfolios, name, tickers)
 
             #Download button
-            if st.button("Download Portfolio Data", width='stretch'):
-                with st.spinner("Downloading portfolio data..."):
-                    try:
-                        #Use cached data download
-                        df, df_error, df_warning = cached_get_data(tickers, lbound, ubound, period=period, start_date=start_date, end_date=end_date)
-                        if df_warning:
-                            st.warning(df_warning, icon="⚠️")
+            if portfolios[name]['config_complete']:
+                st.button("Download Portfolio Data", width='stretch', disabled=True)
+            else:
+                confirm = st.button("Download Portfolio Data", width='stretch')
+                if confirm:
+                    with st.spinner("Downloading portfolio data..."):
+                        try:
+                            #Use cached data download
+                            df, df_error, df_warning = cached_get_data(tickers, lbound, ubound, period=period, start_date=start_date, end_date=end_date)
+                            if df_warning:
+                                st.warning(df_warning, icon="⚠️")
 
-                        #Get weights
-                        if type_weight == 'custom' and custom_weights_list:
-                            weights, w_error = cached_get_weights(tickers, lbound, ubound, period, start_date, end_date, type_weight, custom_weights_list)
-                        else:
-                            weights, w_error = cached_get_weights(tickers, lbound, ubound, period, start_date, end_date, type_weight)
-
-                        #Initalize port for plotting functions
-                        port = Portfolio(tickers, lbound, ubound)
-                        port.portfolio_df = df
-                        port.weights = weights
-
-                        #Process portfolio data
-                        _, norm_error = port.normalize_portfolio_data()
-                        _, c_error = port.get_portfolio_colors()
-    
-                        #Create plots
-                        pie_chart, pie_error = port.plot_pie()
-                        line_chart, line_error = port.plot_line()
-
-                        #Error checks
-                        if df_error:
-                            st.error(f"Error in downloading portfolio data: {df_error}", icon='❌')
-                        elif w_error:
-                            st.error(f"Error in calculating weights: {w_error}", icon='❌')
-                        elif norm_error:
-                            st.error(f"Error in normalizing portfolio data: {norm_error}", icon='❌')
-                        elif c_error:
-                            st.error(f"Error in constructing asset colors: {c_error}", icon='❌')
-                        elif pie_error:
-                            st.error(f"Error in building weight pie plot: {pie_error}", icon='❌')
-                        elif line_error:
-                            st.error(f"Error in building portfolio data line chart: {line_error}", icon='❌')
-                        else:
-                            # Store in session state
-                            portfolios =  st.session_state.portfolios
-                            name = st.session_state.current_portfolio
-                            portfolios[name]['config_complete'] = True
-                            portfolios[name]['configs']['tickers'] = tickers
-                            portfolios[name]['configs']['portfolio_value'] = portfolio_value
-
-                            if period and start_date is None and end_date is None:
-                                portfolios[name]['configs']['timeframe'] = period
+                            #Get weights
+                            if type_weight == 'custom' and custom_weights_list:
+                                weights, w_error = cached_get_weights(tickers, lbound, ubound, period, start_date, end_date, type_weight, custom_weights_list)
                             else:
-                                portfolios[name]['configs']['timeframe'] = start_date, end_date
+                                weights, w_error = cached_get_weights(tickers, lbound, ubound, period, start_date, end_date, type_weight)
 
-                            portfolios[name]['configs']['weight_allocation']['method'] = type_weight
-                            portfolios[name]['configs']['weight_allocation']['lbound'] = lbound
-                            portfolios[name]['configs']['weight_allocation']['ubound'] = ubound
-                            portfolios[name]['configs']['df']['data'] = df
-                            portfolios[name]['configs']['df']['warning'] = df_warning
-                            portfolios[name]['configs']['weights'] = weights
-                            portfolios[name]['configs']['pie'] = pie_chart
-                            portfolios[name]['configs']['line'] = line_chart
-                            
-                            st.success("Portfolio data downloaded successfully!", icon="✅")
-                            time.sleep(1)
-                            st.rerun()
+                            #Initalize port for plotting functions
+                            port = Portfolio(tickers, lbound, ubound)
+                            port.portfolio_df = df
+                            port.weights = weights
 
-                    except Exception as e:
-                        st.error(f"Portfolio initalization failed: {str(e)}", icon='❌')
+                            #Process portfolio data
+                            _, norm_error = port.normalize_portfolio_data()
+                            _, c_error = port.get_portfolio_colors()
+        
+                            #Create plots
+                            pie_chart, pie_error = port.plot_pie()
+                            line_chart, line_error = port.plot_line()
+
+                            #Error checks
+                            if df_error:
+                                st.error(f"Error in downloading portfolio data: {df_error}", icon='❌')
+                            elif w_error:
+                                st.error(f"Error in calculating weights: {w_error}", icon='❌')
+                            elif norm_error:
+                                st.error(f"Error in normalizing portfolio data: {norm_error}", icon='❌')
+                            elif c_error:
+                                st.error(f"Error in constructing asset colors: {c_error}", icon='❌')
+                            elif pie_error:
+                                st.error(f"Error in building weight pie plot: {pie_error}", icon='❌')
+                            elif line_error:
+                                st.error(f"Error in building portfolio data line chart: {line_error}", icon='❌')
+                            else:
+                                # Store in session state
+                                portfolios =  st.session_state.portfolios
+                                name = st.session_state.current_portfolio
+                                portfolios[name]['config_complete'] = True
+                                portfolios[name]['configs']['tickers'] = tickers
+                                portfolios[name]['configs']['portfolio_value'] = portfolio_value
+
+                                if period and start_date is None and end_date is None:
+                                    portfolios[name]['configs']['timeframe'] = period
+                                else:
+                                    portfolios[name]['configs']['timeframe'] = start_date, end_date
+
+                                portfolios[name]['configs']['weight_allocation']['method'] = type_weight
+                                portfolios[name]['configs']['weight_allocation']['lbound'] = lbound
+                                portfolios[name]['configs']['weight_allocation']['ubound'] = ubound
+                                portfolios[name]['configs']['df']['data'] = df
+                                portfolios[name]['configs']['df']['warning'] = df_warning
+                                portfolios[name]['configs']['weights'] = weights
+                                portfolios[name]['configs']['pie'] = pie_chart
+                                portfolios[name]['configs']['line'] = line_chart
+                                
+                                st.success("Portfolio data downloaded successfully!", icon="✅")
+                                time.sleep(1)
+                                st.rerun()
+
+                        except Exception as e:
+                            st.error(f"Portfolio initalization failed: {str(e)}", icon='❌')
 
     with pcol2:
         render_pie(portfolios, name)
