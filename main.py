@@ -30,6 +30,8 @@ def initalize_session_state():
         st.session_state.sim_analyzer = None
     if 'current_path_type' not in st.session_state:
         st.session_state.current_path_type = None
+    if 'view_mode' not in st.session_state:
+        st.session_state.view_mode = 'Detailed View'
 
 initalize_session_state()
 

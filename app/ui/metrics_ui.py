@@ -85,22 +85,26 @@ def render_metric_cards(portfolios:dict, name:str):
                 st.session_state.current_path_type = path_type
                 st.rerun()
             
-        #Get desired path type data
+        #Populate all scenarios with each path
         scenario_name = st.session_state.current_scenario
         current_path = st.session_state.current_path_type
-        if scenarios[scenario_name]['display_paths'] is None:
-            repr_results, repr_error = S.get_display_path(scenario_name, 'Representative')
-            best_results, best_error = S.get_display_path(scenario_name, 'Best')
-            worst_results, worst_error = S.get_display_path(scenario_name, 'Worst')
-            if repr_error or best_error or worst_error:
-                st.error(f"Error getting display path: {repr_error or best_error or worst_error}", icon='❌')
-                return 
-            
-            scenarios[scenario_name]['display_paths'] = {
-                'Representative': repr_results,
-                'Best': best_results,
-                'Worst': worst_results
-            }
+        scenario_labels = portfolios[name]['scenarios'].keys()
+        for s_name in scenario_labels:
+            if scenarios[s_name]['display_paths'] is None:
+                repr_results, repr_error = S.get_display_path(s_name, 'Representative')
+                best_results, best_error = S.get_display_path(s_name, 'Best')
+                worst_results, worst_error = S.get_display_path(s_name, 'Worst')
+                if repr_error or best_error or worst_error:
+                    st.error(f"Error getting display path: {repr_error or best_error or worst_error}", icon='❌')
+                    return 
+                
+                scenarios[s_name]['display_paths'] = {
+                    'Representative': repr_results,
+                    'Best': best_results,
+                    'Worst': worst_results
+                }
+
+        #Extract current scenario metrics for current use
         metrics = scenarios[scenario_name]['display_paths'][current_path][0]
 
     else: #Historical Replay case
@@ -218,7 +222,6 @@ def render_cumulative_returns(portfolios:dict, name:str):
     current_path = st.session_state.current_path_type
     sim_analyzer = st.session_state.sim_analyzer
 
-    has_monte_carlo = any(scenarios[s]['sim_method'] == 'Monte Carlo' for s in scenarios)
     has_multiple_scenarios = len(scenarios.keys()) > 1
 
     #Get combined cumulative returns 
@@ -227,12 +230,15 @@ def render_cumulative_returns(portfolios:dict, name:str):
     #Monte Carlo scenario
     if scenarios[scenario_name]['sim_method'] == 'Monte Carlo':
         if has_multiple_scenarios:
-            view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True)
+            view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True, 
+                                 index=0 if st.session_state.view_mode == 'Detailed View' else 1)
         else:
             view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True, index=0, disabled=True)
 
     elif scenarios[scenario_name]['sim_method'] == 'Historical Replay': #Historical Replay scenario
         view_mode = st.radio("**View Mode:**", ['Detailed View', 'Compare Scenarios'], horizontal=True, index=1, disabled=True)
+
+    st.session_state.view_mode = view_mode
 
     if view_mode == 'Detailed View': #Shows all three path cumulative returns for selected scenario
         st.caption("_Plots representative, best, and worst path of current Monte Carlo scenario_")
