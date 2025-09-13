@@ -1,6 +1,7 @@
 
 # Portfolio Risk Simulator
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://portfolio-risk-sim.streamlit.app/)
 [![Python](https://img.shields.io/badge/Python-3.13%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -9,23 +10,28 @@ A comprehensive Python application built with professional risk-assessment metho
 
 ## 🚀 Features
 
-#### **Interface & Navigation**
+<details>
+<summary><strong>Interface & Navigation</strong></summary>
 
 - **Interactive Web Interface:** Streamlit-based UI with intuitive navigation and real-time updates
 
 - **Efficient Multi-Portfolio Management:** Create and compare multiple portfolios with clean sidebar navigation
 
 - **Real-time Finanical Data Integration:** Automated data fetching using yfinance
+</details>
 
-#### **Portfolio Configuration**
+<details>
+<summary><strong>Portfolio Configuration</strong></summary>
 
 - **Flexible Asset Selection:** Support for custom tickers and investment amounts
 
 - **Advanced Weight Allocation**: Choose from equal weights, Sharpe ratio-optimized weights, or custom weights
 
 - **Initial Portfolio Analytics:** Dynamic pie charts and normalized price history visualizations using Plotly for immediate portfolio insights
+</details>
 
-#### **Risk Simulation Engine**
+<details>
+<summary><strong>Risk Simulation Engine</strong></summary>
 
 - **Monte Carlo Simulations:** Advanced engine integrated with  Hidden Markov Models to model different volatility regimes (Low, Medium, High volatility states) 
 
@@ -37,8 +43,10 @@ A comprehensive Python application built with professional risk-assessment metho
     - Dot-Com Bubble 
     - 2011 Eurozone Crisis
     - 2022 Inflation Crash
+</details>
 
-#### **Advanced Risk Analysis**
+<details>
+<summary><strong>Advanced Risk Analysis</strong></summary>
 
 - **Factor Classification & Stress Testing:** Classify and apply user-defined shocks on Fama-French factors (3-factor and 5-factor models) and Momentum to reveal and test specific portfolio exposures
 
@@ -50,8 +58,10 @@ A comprehensive Python application built with professional risk-assessment metho
     - Sharpe Ratio
     - 95% Value-at-Risk (VaR)
     - Maximum Drawdown
+</details>
 
-#### **Results Visualization & Analysis**
+<details>
+<summary><strong>Results Visualization & Analysis</strong></summary>
 
 - **Baseline Comparison:** Visual delta analysis between simulation results and historical baseline metrics
 
@@ -64,8 +74,10 @@ A comprehensive Python application built with professional risk-assessment metho
 - **Risk Attribution Analysis:** Percent Contribution of Risk (PCR) charts showing each asset's contribution to total portfolio volatility
 
 - **Statistical Distribution Analysis:** Kernel Density Estimation (KDE) charts for comprehensive metric distribution comparisons across all scenarios
+</details>
 
-#### **Professional-Grade Capabilities**
+<details>
+<summary><strong>Professional-Grade Capabilities</strong></summary>
 
 - **Multi-Scenario Comparison:** Side-by-side analysis of different stress test scenarios
 
@@ -76,8 +88,7 @@ A comprehensive Python application built with professional risk-assessment metho
 - **Configuration Lock Mechanism:** Once portfolio and simulation configurations are confirmed, scenarios are locked to prevent accidental modifications and ensure result integrity
 
 - **Interactive Decision Support:** Real-time parameter adjustment and immediate result visualization
-
-
+</details>
 
 ## 📊 Screenshots
 
@@ -149,7 +160,7 @@ _Ready-to-use risk analysis tool_
 For customization, development, or enhanced performance:
 
 #### Prerequisites
-- Python 3.7+
+- Python 3.13+
 - pip package manager
 - Git
     
@@ -174,7 +185,7 @@ streamlit run main.py
 
 ## 📜 License 
 
-This project is licensed under the terms of the ![MIT License](LICENSE)
+This project is licensed under the terms of the [MIT License](LICENSE)
 
 ## ⚠️ Disclaimer
 This application is intended for educational purposes only. Investment involves risk, and past performance is not indicative of future results. Consult with a qualified financial advisor before making investment decisions.
